@@ -8,14 +8,17 @@ void forcePerception(){
   const int calibrationFactorGrams = 64;
   HX711 forceSensor;
   //callabration 
+
+  //send data to the script to start the login there:
+  Serial.println("StartForceTest");
+
   forceSensor.begin(DAT, CLK);
   forceSensor.tare();
   forceSensor.set_scale(calibrationFactorNewtons);
 
-  //get the random number of numtons to start the test
+  //get the random number of numtons to start the test and send it to the script
   int randomNumber = random(0, 10);
-
-  //some code to declare that the test began (lesa han4oof hykoon eh fi el 8aleb led aw buzzer)
+  Serial.println(randomNumber);
 
   //sensor takes 5 earding and gets the average for it to be fair
   float total = 0;
@@ -26,8 +29,8 @@ void forcePerception(){
   float average = total/5;
   float error = average - randomNumber;
 
-  Serial.print(error);
-  Serial.print(" ,");
+  //send the error to the script
+  Serial.println(error);
 }
 
 void setup() {
