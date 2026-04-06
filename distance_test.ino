@@ -36,7 +36,7 @@ void distance_test(){
   error=randomNum-distance;
   x=abs(error);   // abs()>>>>>>to give us the absolut value
   accuracy= (1.0 - (x / randomNum)) * 100;
-  if (accuracy < 0) acuracy = 0; // if your so dumm that you have accuracy in negative it will give you zero
+  if (accuracy < 0) accuracy = 0; // if your so dumm that you have accuracy in negative it will give you zero
 
   //Serial.print("accuracy=");
   //Serial.print(accuracy);
