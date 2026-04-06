@@ -26,38 +26,35 @@ void loop() {
   Serial.print("STATION_1 FINISHED");
   }
 }
+long runStation1()
+ {
+  Serial.println(" PLEASE_PLACE_HAND_ON_SENSOR :)");
+  while (getSt1Distance() > 5 || getSt1Distance() == 0);
 
-long runStation1() {
   for (int i = 0; i < 3; i++) {
-    digitalWrite(st1_redLed, HIGH);
-     delay(700);
-    digitalWrite(st1_redLed, LOW);
-      delay(700);
+    digitalWrite(st1_redLed, HIGH); 
+    delay(700);
+    digitalWrite(st1_redLed, LOW);  
+    delay(700);
   }
-
-  delay(random(1000, 4000));
-  
+  delay(random(1000, 4000)); 
   digitalWrite(st1_greenLed, HIGH);
+  delay(50); 
+  
   long startTime = millis();
 
-  // while (getSt1Distance() > 2) {
-    
-  // }
-
-  while (true)
-  {
-    long d1 = getSt1Distance();
-    delay(5);
-    long d2 = getSt1Distance();
-    delay(5);
-    long d3 = getSt1Distance();
-    if(d1 >0 && d1 <=3 && d2 > 0 && d2 <= 3 && d3 > 0 && d3 <= 3){
-      break;
+  int ta2ked_el3ad = 0;
+  while (ta2ked_el3ad < 3) {
+    if (getSt1Distance() > 15) { 
+      ta2ked_el3ad++;
+    } else {
+      ta2ked_el3ad = 0; 
     }
+    delay(5);
   }
-  long reflexTime = millis() - startTime;
-  digitalWrite(st1_greenLed, LOW);
 
+  digitalWrite(st1_greenLed, LOW);
+  long reflexTime = (millis() - startTime) + 50;
   return reflexTime;
 }
 long getSt1Distance() {
