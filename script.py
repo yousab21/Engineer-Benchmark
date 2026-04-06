@@ -6,27 +6,33 @@ BAUD = 9600
 
 ser = serial.Serial(PORT, BAUD, timeout=5)
 time.sleep(2)  # wait for Arduino to finish resetting
-def readNextLine():
+
+def readResponce():
     while(True):
         line = ser.readline().decode('utf-8').strip()
         if line:
             break
     return line
 
+def sendRequest(request):
+    ser.write(f'{request}\n'.encode())
+
+
 def forceTest():
-    line = readNextLine()
-    randomNumber = float(line)
+    sendRequest("FORCE_TEST")
+    randomNumber = float(readResponce())
     print(f"apply {randomNumber} newtons on the hook")
-    line = readNextLine()
-    error = float(line)
-    print(f"you were off by {error} newtons")
+    error = float(readResponce())
+    print(f"you were off by {error}%")
 
-
-while True:
-    line = readNextLine()
-    if line == 'StartForceTest':
-        forceTest()
+def distanceTest():
+    sendRequest("DISTANCE_TEST")
+    randomNumber = float(readResponce())
+    print(f"raise your hand {randomNumber}cm from the sensor")
+    error = float(readResponce())
+    print(f"you were off by {error}%")
                 
 
     
+
 
