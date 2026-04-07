@@ -11,6 +11,7 @@ float distance=0;
 void distance_test(){ 
  
   Serial.begin(9600);
+  randomSeed(analogRead(A0));
   pinMode(echo,INPUT);
   pinMode(trig,OUTPUT);
   randomNum=random(60,300);
