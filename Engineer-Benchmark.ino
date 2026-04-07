@@ -1,4 +1,3 @@
-
 #include<HX711.h>
 
 void forceTest(){
@@ -15,12 +14,13 @@ void forceTest(){
   //get the random number of numtons to start the test and send it to the script
   int randomNumber = random(0, 10);
   Serial.println(randomNumber);
+  delay(3000);
 
   //sensor takes 5 earding and gets the average for it to be fair
   float total = 0;
   for (int i = 0 ; i< 5 ; i++){
     total += forceSensor.get_units(10);
-    delay(100);
+    delay(1000);
   }
   float average = abs(total/5);
   float error = (average - randomNumber) / average;
@@ -48,9 +48,10 @@ float distance=0;
   //chooses a raandom number and sends it to the script
   randomNum=random(10,80);
   Serial.println(randomNum);
+  delay(3);
   
  float sum=0;
- for( int i=0;i<4;i++){
+ for( int i=0;i<5;i++){
   //callabration
  digitalWrite(trig,LOW);
  delayMicroseconds(5);
@@ -63,10 +64,10 @@ float distance=0;
  if (time == 0) { i--; continue;}   // this was a help from my brother (claud), it return to the start of (for loop) if the sensour did not recive respond for a body
  float d=(time*0.0343)/2;
  sum+=d;
- delay(50);
+ delay(1000);
   }
 
-  distance=sum/4;
+  distance=sum/5;
   error=randomNum-distance;
   x=abs(error);   // abs()>>>>>>to give us the absolut value
   Serial.println(x);
