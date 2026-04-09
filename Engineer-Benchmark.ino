@@ -71,7 +71,8 @@ float distance=0;
 
   distance=sum/5;
   error=randomNum-distance;
-  x=abs(error);   // abs()>>>>>>to give us the absolut value
+  relativeError = erorr / randomNum;
+  x=abs(relativeError);   // abs()>>>>>>to give us the absolut value
   Serial.println(x);
 
   //this is kinda cool but we want to always send the error percentageto the script not acuracy :(
