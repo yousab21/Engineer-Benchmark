@@ -1,3 +1,4 @@
+
 #include<HX711.h>
 
 void forceTest(){
@@ -18,15 +19,16 @@ void forceTest(){
 
   //sensor takes 5 earding and gets the average for it to be fair
   float total = 0;
+  float relativeError = 0;
   for (int i = 0 ; i< 5 ; i++){
     total += forceSensor.get_units(10);
+    relativeError = total - randomNumber;
     delay(1000);
   }
-  float average = abs(total/5);
-  float error = (average - randomNumber) / average;
+  float averageError = abs(relativeError/5);
 
   //send the error percentage to the script
-  Serial.println(error);
+  Serial.println(averageError);
 }
 //========================================================
 

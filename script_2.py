@@ -1,4 +1,5 @@
 
+
 import serial
 import time
 
@@ -48,17 +49,16 @@ arduino = Ye_Old_Arduino_Handler()
 
 class Test:
 
+    keyWord = "UNKOWN"
+    testName = "UNKOWN"
+    instructions = "UNKOWN"
+    timer = 0
+    randomNumber = 0
+    result = 0
     def __init__(self):
-        self.keyWord = "UNKOWN"
-        self.testName = "UNKOWN"
-        self.instructions = "UNKOWN"
-        self.timer = 0
-        self.randomNumber = 0
-        self.result = 0
-
+        pass
     def getRandomNumber(self):
         self.randomNumber = (arduino.safeRead())
-
     def getResult(self):
         self.result = (arduino.safeRead())
 
@@ -128,7 +128,7 @@ class UI:
         print("\n ==== ENGINEER BENCHMARK ====")
     
     def getUsername(self):
-        return input("Enter your name (or 'quit' to exit)")
+        return input("Enter your name (or 'quit' to exit) : ")
     
     def showWelcomeBack(self, name, best_score):
         print(f"Welcome back {name}! Your best accuracy is {(best_score):.2f} % !")
@@ -144,6 +144,8 @@ class UI:
         if not self.leaderboard:
             print("\n ==== Leaderboard ====")
             print(" No scores yet.")
+            #kan fi heda bas bug eno hydisplay el leadebaords for 10ms we yed5ol 3la el ba3do
+            input("Press enter for new participant...")
             return
         sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1])
         print("\n ==== Leaderboard ====")
@@ -161,7 +163,6 @@ class UI:
 
 def main():
     ui = UI()
-
     while True:
         ui.welcomeScreen()
         name = ui.getUsername()
@@ -172,7 +173,7 @@ def main():
             ui.showWelcomeBack(name, ui.leaderboard[name])
         
         # running tests
-        tests = [ForceTest(), DistanceTest()]
+        tests = [ForceTest()] 
         errors = []
         for test in tests:
            test.beginTest()
@@ -182,6 +183,5 @@ def main():
         newBest = ui.updateLeaderboard(name, avg)
         ui.showResults(name, avg, newBest)
         ui.displayLeaderboard()
-
 if __name__ == "__main__":
     main()
