@@ -130,7 +130,7 @@ void loop() {
         } else if (request == "DISTANCE_TEST") {
             distanceTest();       // future test
         }
-        else if(request == "REACTION_TEST"){
+        else if(request == "REFLEX_TEST"){
             reflexTest();
         }else {
             Serial.println("BAD_REQUEST");
