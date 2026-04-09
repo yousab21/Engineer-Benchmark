@@ -117,6 +117,11 @@ class DistanceTest(Test):
     instructions = "Raise your hand the following number of cm above the sensor"
     timer = 5
 
+class ReflexTest(test):
+    keyWord = "REFLEX_TEST"
+    testName = "Reflex Test"
+    instructions = "hold your hand above the sensor and remove it when you see the green light"
+    timer = 8
 
 #===============================================
 class UI:
@@ -173,7 +178,7 @@ def main():
             ui.showWelcomeBack(name, ui.leaderboard[name])
         
         # running tests
-        tests = [ForceTest()] 
+        tests = [ForceTest() , DistanceTest() , ReflexTest() ] 
         errors = []
         for test in tests:
            test.beginTest()
