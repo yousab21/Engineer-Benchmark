@@ -117,11 +117,30 @@ class DistanceTest(Test):
     instructions = "Raise your hand the following number of cm above the sensor"
     timer = 5
 
-class ReflexTest(test):
+
+class ReflexTest(Test):
     keyWord = "REFLEX_TEST"
     testName = "Reflex Test"
     instructions = "hold your hand above the sensor and remove it when you see the green light"
-    timer = 8
+    timer = 0 #we dont use this here
+
+    #reflex test works a bit diffrentally then other test so i override those functions
+    def countdown(self):
+        utils.clear()
+        print()
+        print()
+        print("waiting for you to finish the test")
+        print()
+        
+    def printResult(self):
+        utils.clear()
+        print()
+        print()
+        print(f"------------------|| result for {self.testName}")
+        print(f"------------------|| =============================")
+        print(f"------------------|| your reflex is {self.result}ms")
+        print(f"------------------|| press enter to continue")
+        input()
 
 #===============================================
 class UI:
