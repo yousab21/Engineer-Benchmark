@@ -1,8 +1,7 @@
 
-
 import serial
 import time
-
+import json 
 PORT = '/dev/ttyUSB0'
 BAUD = 9600
 
@@ -49,16 +48,17 @@ arduino = Ye_Old_Arduino_Handler()
 
 class Test:
 
-    keyWord = "UNKOWN"
-    testName = "UNKOWN"
-    instructions = "UNKOWN"
-    timer = 0
-    randomNumber = 0
-    result = 0
     def __init__(self):
-        pass
+        self.keyWord = "UNKOWN"
+        self.testName = "UNKOWN"
+        self.instructions = "UNKOWN"
+        self.timer = 0
+        self.randomNumber = 0
+        self.result = 0
+
     def getRandomNumber(self):
         self.randomNumber = (arduino.safeRead())
+
     def getResult(self):
         self.result = (arduino.safeRead())
 
@@ -116,53 +116,114 @@ class DistanceTest(Test):
     testName = "Distance Perception Test"
     instructions = "Raise your hand the following number of cm above the sensor"
     timer = 5
+class ReflexTest(Test):
+    keyWord = "REFLEX_TEST"
+    testName = "Reflex Test"
+    instructions = "hold your hand above the sensor and remove it when you see the green light"
+    timer = 0 
 
+
+    def countdown(self):
+        utils.clear()
+        print()
+        print()
+        print("waiting for you to finish the test")
+        print()
+        
+    def printResult(self):
+        utils.clear()
+        print()
+        print()
+        print(f"------------------|| result for {self.testName}")
+        print(f"------------------|| =============================")
+        print(f"------------------|| your reflex is {self.result}ms")
+        print(f"------------------|| press enter to continue")
+        input()
+
+#================================================
+
+class JsonParcer():
+    def __init__(self):
+        self.filename = "scores.json"
+        
+    def loadScores(self): 
+        try:
+            with open(self.filename, "r") as file:
+                return json.load(file)
+        except FileNotFoundError:
+                return {}
+        
+    def saveScores(self,data): 
+        with open(self.filename, "w") as file:
+            json.dump(data, file, indent=2)
+            
+parcer = JsonParcer()
 
 #===============================================
 class UI:
-    def __init__(self):
-        self.leaderboard = {}
-    
+    def __init__(self): 
+        self.leaderboard = parcer.loadScores()
+
     def welcomeScreen(self):
         utils.clear()
         print("\n ==== ENGINEER BENCHMARK ====")
     
     def getUsername(self):
-        return input("Enter your name (or 'quit' to exit) : ")
-    
-    def showWelcomeBack(self, name, best_score):
-        print(f"Welcome back {name}! Your best accuracy is {(best_score):.2f} % !")
-    
-    
-    def showResults(self, name, avg, is_new_best):
-        print(f"\n{name} your accuracy is {(avg):.2f}%")
-        if is_new_best:
-            print("New personal best!")
-    
+        return input("Enter your name (or 'quit' to exit)")
+
+
+    def showWelcomeBack(self,name, data):
+        print(f"Welcome back {name}!, Your best results are below.")
+        print(f"Force: {data['Station1(F)']:.2f}%")        
+        print(f"Distance: {data['Station2(D)']:.2f}%")        
+        print(f"Reaction: {data['Station3(R)']:.2f}ms")        
+        print(f"AvgScore: {data['AverageScore']:.2f}%")        
+ 
+
+    def showResults(self, name, errorsList, avg, isNewBest):
+        print(f"\n{name}, your results for this session:")
+        print(f"  Force: {errorsList[0]:.2f}%")
+        print(f"  Distance: {errorsList[1]:.2f}%")
+        print(f"  Reaction: {errorsList[2]:.2f}ms")
+        print(f"  Average: {avg:.2f}%")
+        if isNewBest:
+             print("New personal best!")
+
     
     def displayLeaderboard(self):
         if not self.leaderboard:
             print("\n ==== Leaderboard ====")
             print(" No scores yet.")
-            #kan fi heda bas bug eno hydisplay el leadebaords for 10ms we yed5ol 3la el ba3do
             input("Press enter for new participant...")
             return
-        sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1])
+        sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1]["AverageScore"]) #el sort brdo bysht8l bel avgscore
         print("\n ==== Leaderboard ====")
-        for i, (name, score) in enumerate(sortedScores, 1):
-           print(f"{i}, {name}: {(score):.2f}%")
-        print("=============================")
+        for i, (name, data) in enumerate(sortedScores, 1):
+           print(f"{i}. {name}")
+           print(f"   ┌───────────────────────────────────────┐") #el symbols de hna https://en.wikipedia.org/wiki/Box-drawing_characters
+           print(f"   │ Force   │ Distance│ Reaction│ Average │")
+           print(f"   ┣───────────────────────────────────────┤")
+           print(f"   │ {data['Station1(F)']:7.2f} │ {data['Station2(D)']:7.2f} │ {data['Station3(R)']:7.2f} │ {data['AverageScore']:7.2f} │")
+           print(f"   └───────────────────────────────────────┘")
+                 
 
-    def updateLeaderboard(self, name, score):
-        if name not in self.leaderboard or score < self.leaderboard[name]:
-             self.leaderboard[name] = (score)
-             return True
+    def updateLeaderboard(self, name, errorsList, avgScore):
+        if name not in self.leaderboard or avgScore < self.leaderboard[name]["AverageScore"]:
+            self.leaderboard[name] = {
+                "Station1(F)": errorsList[0],
+                "Station2(D)": errorsList[1],
+                "Station3(R)": errorsList[2],
+                "AverageScore": avgScore
+            }
+            parcer.saveScores(self.leaderboard)
+            return True
         return False
-
-
+    
+#==========================================
 
 def main():
     ui = UI()
+
     while True:
         ui.welcomeScreen()
         name = ui.getUsername()
@@ -173,15 +234,16 @@ def main():
             ui.showWelcomeBack(name, ui.leaderboard[name])
         
         # running tests
-        tests = [ForceTest()] 
-        errors = []
+        tests = [ForceTest(), DistanceTest(),ReflexTest()]
+        results = []
         for test in tests:
            test.beginTest()
-           errors.append(test.result)
-        avg = sum(errors)/len(errors)
-        
-        newBest = ui.updateLeaderboard(name, avg)
-        ui.showResults(name, avg, newBest)
+           results.append(test.result)
+        avg = (results[0]+results[1])/2 #hna ana shelt mwdo3 el len da 7alyn 3shan el reflextest asln msh error fna msh 3arf a3ml fe7 eh 7alyn 
+        newBest = ui.updateLeaderboard(name,results, avg)
+        ui.showResults(name,results, avg, newBest)
         ui.displayLeaderboard()
+
 if __name__ == "__main__":
     main()
+    
