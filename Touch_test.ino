@@ -53,14 +53,14 @@ void touch_test() {
   Serial.println("s");
 
   if (absDiff < 0.15) {
-    Serial.println("RANK: TIME MASTER (  عالمي! 👑)");
+    Serial.println("RANK: TIME MASTER ( ! عالمي 👑)");
     // tone(buzzerPin, 2000, 1000);
   } else if (absDiff < 0.4) {
-    Serial.println("RANK: SNIPER (: قريب جداً");
+    Serial.println("RANK: SNIPER (: ! قريب جداً 👌)");
   } else if (absDiff < 0.8) {
-    Serial.println("RANK: NOT BAD ( شغال )");
+    Serial.println("RANK: NOT BAD ( ! شغال 👍)");
   } else {
-    Serial.println("RANK: BAD ( صحي النوم ) ");
+    Serial.println("RANK: BAD ( ! صحي النوم 😴) ");
     // tone(buzzerPin, 200, 500);
   }
 
