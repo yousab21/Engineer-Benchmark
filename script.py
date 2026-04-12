@@ -66,6 +66,10 @@ class Ye_Other_Json_Parcer(): #sorry couldnt resist the joke was too good XD
     def saveScores(self,data): 
         with open(self.filename, "w") as file:
             json.dump(data, file, indent=2)
+
+    def deleteEverything(self):
+        leaderboard = {}
+        self.saveScores(leaderboard)
             
 parcer = Ye_Other_Json_Parcer()
 
@@ -173,7 +177,7 @@ class UI:
 
     def welcomeScreen(self):
         utils.clear()
-        utils.print_centered("\n ==== ENGINEER BENCHMARK ====")
+        utils.print_centered("=========== ENGINEER BENCHMARK =============")
     
     def getUsername(self):
         return input("Enter your name (or 'quit' to exit)")
@@ -257,4 +261,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+
+#for testing 
+#parcer.deleteEverything()
