@@ -1,4 +1,6 @@
 #include <HX711.h>
+#include <MPU6050.h>
+#include <Wire.h>
 
 // Force Test pins
 #define FORCE_DAT 4
@@ -9,13 +11,19 @@
 #define DIST_ECHO 7
 
 // Reflex Test pins
-#define REFLEX_TRIG    2
-#define REFLEX_ECHO    3
-#define REFLEX_RED_LED 11
+#define REFLEX_TRIG      2
+#define REFLEX_ECHO      3
+#define REFLEX_RED_LED   11
 #define REFLEX_GREEN_LED 12
 
 // Time Perception Test pins
 #define TIME_TOUCH 8
+
+//Agnle Perception Test pins
+//this sensors works via i2c and those pins are hard coded into
+//the library those comments are just for us when we assemble the project
+// SDA -> A4 
+// SCL -> A5
 
 //===============================================================
 
@@ -134,6 +142,40 @@ void timePerceptionTest() {
 
 //===============================================================
 
+void anglePerceptionTest(){
+  randomSeed(analogRead(0));
+  bool positive = random(0, 2);
+  int randomAngle;
+  if (positive) {
+    randomAngle = random(10, 80);
+  } else {
+    randomAngle = random(-80, -10);
+  }
+
+  Serial.println(randomAngle);
+  delay(3000);
+
+  MPU6050 mpu;
+  Wire.begin();
+  mpu.initialize();
+
+  float totalError = 0;
+  for (int i = 0; i < 5; i++) {
+    int16_t ax, ay, az, gx, gy, gz;
+    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    float angle = atan2((float)ax, (float)az) * 180.0 / PI;
+    float error = abs(angle - randomAngle);
+    totalError += error;
+    delay(1000);
+  }
+
+  float avgError = totalError / 5;
+  float errorPercent = (avgError / abs(randomAngle)) * 100.0;
+  Serial.println(errorPercent);
+}
+
+//===============================================================
+
 void setup() {
   Serial.begin(9600);
 
@@ -159,6 +201,7 @@ void loop() {
     else if (request == "DISTANCE_TEST") distanceTest();
     else if (request == "REFLEX_TEST")   reflexTest();
     else if (request == "TIME_TEST")     timePerceptionTest();
+    else if (request == "ANGLE_TEST")    anglePerceptionTest();
     else                                 Serial.println("BAD_REQUEST");
   }
 }

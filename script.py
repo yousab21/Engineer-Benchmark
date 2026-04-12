@@ -181,6 +181,22 @@ class TimePerceptionTest(Test):
         utils.print_centered("test running — tap when you think time is up!")
         print()
 
+class AnglePerceptionTest(Test):
+    keyWord = "ANGLE_TEST"
+    testName = "Angle Perception Test"
+    instructions = "tilt the device to the following angle in degrees"
+    timer = 5
+
+    def printResult(self):
+        utils.clear()
+        print()
+        print()
+        utils.print_centered(f"result for {self.testName}")
+        utils.print_centered(f"=======================================")
+        utils.print_centered(f"you were off by {self.result} %")
+        utils.print_centered(f"press enter to continue")
+        input()
+
 #===============================================
 class UI:
     def __init__(self): 
@@ -191,16 +207,19 @@ class UI:
         utils.print_centered("=========== ENGINEER BENCHMARK =============")
     
     def getUsername(self):
-        return input("Enter your name (or 'quit' to exit): ")
+        utils.print_centered(f"Enter your name (or 'quit' to exit): " , end="")
+        return input()
 
     def showWelcomeBack(self, name, data):
         utils.print_centered(f"Welcome back {name}!, Your best results are below.")
         utils.print_centered(f"Force:      {data['Station1(F)']:.2f}%")        
         utils.print_centered(f"Distance:   {data['Station2(D)']:.2f}%")        
         utils.print_centered(f"Reaction:   {data['Station3(R)']:.2f}ms")        
-        utils.print_centered(f"Time:       {data['Station4(T)']:.2f}%")        
+        utils.print_centered(f"Time:       {data['Station4(T)']:.2f}%")
+        utils.print_centered(f"Angle:      {data['Station5(A)']:.2f}%")
         utils.print_centered(f"AvgScore:   {data['AverageScore']:.2f}%")        
-        input("press enter to continue : ")
+        utils.print_centered(f"press enter to continue : ")
+        input()
 
     def showResults(self, name, errorsList, avg, isNewBest):
         utils.print_centered(f"{name}, your results for this session:")
@@ -208,13 +227,15 @@ class UI:
         utils.print_centered(f"Distance:   {errorsList[1]:.2f}%")
         utils.print_centered(f"Reaction:   {errorsList[2]:.2f}ms")
         utils.print_centered(f"Time:       {errorsList[3]:.2f}%")
+        utils.print_centered(f"Angle:      {errorsList[4]:.2f}%")
         utils.print_centered(f"Average:    {avg:.2f}%")
         if isNewBest:
             utils.print_centered("New personal best!")
-        input("press enter to continue :")
+        utils.print_centered(f"press enter to continue : ")
+        input()
 
     def showLeaderboardHeader(self):
-        header  = f"{'Name':<12} | {'Force%':>8} | {'Distance%':>9} | {'Reaction(ms)':>12} | {'Time%':>7} | {'Average%':>8}"
+        header  = f"{'Name':<12} | {'Force%':>8} | {'Distance%':>9} | {'Reaction(ms)':>12} | {'Time%':>7} | {'Angle%':>7} | {'Average%':>8}"
         divider = "-" * len(header)
         utils.print_centered(header)
         utils.print_centered(divider)
@@ -223,14 +244,16 @@ class UI:
         utils.print_centered("============ Leaderboard ==============")
         if not self.leaderboard:
             utils.print_centered("No scores yet.")
-            input("Press enter for new participant...")
+            utils.print_centered(f"Press enter for new participant...")
+            input()
             return
         sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1]["AverageScore"])
         self.showLeaderboardHeader()
         for i, (name, data) in enumerate(sortedScores, 1):
-            row = f"{f'{i}. {name}':<12} | {data['Station1(F)']:>8.2f} | {data['Station2(D)']:>9.2f} | {data['Station3(R)']:>12.2f} | {data['Station4(T)']:>7.2f} | {data['AverageScore']:>8.2f}"
+            row = f"{f'{i}. {name}':<12} | {data['Station1(F)']:>8.2f} | {data['Station2(D)']:>9.2f} | {data['Station3(R)']:>12.2f} | {data['Station4(T)']:>7.2f} | {data['Station5(A)']:>7.2f} | {data['AverageScore']:>8.2f}"
             utils.print_centered(row)
-        input("Press enter for new participant...")
+        utils.print_centered(f"Press enter for new participant...")
+        input()
 
     def updateLeaderboard(self, name, errorsList, avgScore):
         if name not in self.leaderboard or avgScore < self.leaderboard[name]["AverageScore"]:
@@ -239,6 +262,7 @@ class UI:
                 "Station2(D)": errorsList[1],
                 "Station3(R)": errorsList[2],
                 "Station4(T)": errorsList[3],
+                "Station5(A)": errorsList[4],
                 "AverageScore": avgScore
             }
             parcer.saveScores(self.leaderboard)
@@ -259,13 +283,13 @@ def main():
         if name in ui.leaderboard:
             ui.showWelcomeBack(name, ui.leaderboard[name])
         
-        tests = [ForceTest(), DistanceTest(), ReflexTest(), TimePerceptionTest()]
+        tests = [ForceTest(), DistanceTest(), ReflexTest(), TimePerceptionTest(), AnglePerceptionTest()]
         results = []
         for test in tests:
             test.beginTest()
             results.append(test.result)
 
-        avg = (results[0] + results[1] + results[3]) / 3  # force + distance + time, reflex excluded from avg
+        avg = (results[0] + results[1] + results[3] + results[4]) / 4  # force + distance + time + angle, reflex excluded
         newBest = ui.updateLeaderboard(name, results, avg)
         ui.showResults(name, results, avg, newBest)
         ui.displayLeaderboard()
