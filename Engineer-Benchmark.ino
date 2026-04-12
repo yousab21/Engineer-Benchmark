@@ -1,140 +1,164 @@
-#include<HX711.h>
+#include <HX711.h>
+
+// Force Test pins
+#define FORCE_DAT 4
+#define FORCE_CLK 5
+
+// Distance Test pins
+#define DIST_TRIG 6
+#define DIST_ECHO 7
+
+// Reflex Test pins
+#define REFLEX_TRIG    2
+#define REFLEX_ECHO    3
+#define REFLEX_RED_LED 11
+#define REFLEX_GREEN_LED 12
+
+// Time Perception Test pins
+#define TIME_TOUCH 8
+
+//===============================================================
+
 void forceTest(){
-  const int DAT = 4;
-  const int CLK = 5;
-  const int calibrationFactorNewtons = 6700;
-  const int calibrationFactorGrams = 64;
   HX711 forceSensor;
-  //callabration 
-  forceSensor.begin(DAT, CLK);
+  const int calibrationFactorNewtons = 6700;
+
+  forceSensor.begin(FORCE_DAT, FORCE_CLK);
   forceSensor.tare();
   forceSensor.set_scale(calibrationFactorNewtons);
-  //get the random number of numtons to start the test and send it to the script
+
+  randomSeed(analogRead(0));
   int randomNumber = random(0, 10);
   Serial.println(randomNumber);
   delay(3000);
-  //sensor takes 5 earding and gets the average for it to be fair
+
   float total = 0;
-  float relativeError = 0;
-  for (int i = 0 ; i< 5 ; i++){
+  for (int i = 0; i < 5; i++){
     total += forceSensor.get_units(10);
-    relativeError = total - randomNumber;
     delay(1000);
   }
-  float averageError = abs(relativeError/5);
-  //send the error percentage to the script
+  float averageReading = total / 5;
+  float averageError = abs(averageReading - randomNumber);
   Serial.println(averageError);
 }
+
 //===============================================================
-void distanceTest(){ 
- 
-float distance=0;
- float time=0;
- const int echo=7;
- const int trig=6;
- int randomNum=0;
- float accuracy=0;
- float error=0;
- float x=0;
- //setup
-  pinMode(echo,INPUT);
-  pinMode(trig,OUTPUT);
-  //chooses a raandom number and sends it to the script
-  randomNum=random(10,80);
+
+void distanceTest(){
+  randomSeed(analogRead(0));
+  int randomNum = random(10, 80);
   Serial.println(randomNum);
-  delay(3);
-  
- float sum=0;
- for( int i=0;i<5;i++){
-  //callabration
- digitalWrite(trig,LOW);
- delayMicroseconds(5);
- digitalWrite(trig,HIGH);
- delayMicroseconds(10); 
- digitalWrite(trig,LOW);
- //distance mesurement
- time =pulseIn(echo,HIGH);
- if (time == 0) { i--; continue;}   // this was a help from my brother (claud), it return to the start of (for loop) if the sensour did not recive respond for a body
- float d=(time*0.0343)/2;
- sum+=d;
- delay(1000);
+  delay(3000);
+
+  float sum = 0;
+  for (int i = 0; i < 5; i++){
+    digitalWrite(DIST_TRIG, LOW);
+    delayMicroseconds(5);
+    digitalWrite(DIST_TRIG, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(DIST_TRIG, LOW);
+    float time = pulseIn(DIST_ECHO, HIGH);
+    if (time == 0) { i--; continue; }
+    float d = (time * 0.0343) / 2;
+    sum += d;
+    delay(1000);
   }
-  distance=sum/5;
-  error=randomNum-distance;
-  float relativeError = error / randomNum;
-  x=abs(relativeError);   // abs()>>>>>>to give us the absolut value
-  Serial.println(x);
-  //this is kinda cool but we want to always send the error percentageto the script not acuracy :(
-  //ill keep it in the code tho as recognition of your work <3
-  //accuracy= (1.0 - (x / randomNum)) * 100;
-  //if (accuracy < 0) acuracy = 0; // if your so dumm that you have accuracy in negative it will give you zero
-} 
-//======================================
-long getSt1Distance() {
-  const int st1_trigPin = 2;
-  const int st1_echoPin = 3;
-  digitalWrite(st1_trigPin, LOW);
+  float distance = sum / 5;
+  float relativeError = abs((randomNum - distance) / randomNum);
+  Serial.println(relativeError);
+}
+
+//===============================================================
+
+long getReflexDistance() {
+  digitalWrite(REFLEX_TRIG, LOW);
   delayMicroseconds(2);
-  digitalWrite(st1_trigPin, HIGH);
+  digitalWrite(REFLEX_TRIG, HIGH);
   delayMicroseconds(10);
-  digitalWrite(st1_trigPin, LOW);
-  long duration = pulseIn(st1_echoPin, HIGH, 30000);
+  digitalWrite(REFLEX_TRIG, LOW);
+  long duration = pulseIn(REFLEX_ECHO, HIGH, 30000);
   if (duration == 0) return 999;
   return duration * 0.034 / 2;
 }
+
 void reflexTest() {
-  const int st1_trigPin = 2;
-  const int st1_echoPin = 3;
-  const int st1_redLed  = 11;
-  const int st1_greenLed = 12;
-  
-  pinMode(st1_trigPin, OUTPUT);
-  pinMode(st1_echoPin, INPUT);
-  pinMode(st1_redLed, OUTPUT);
-  pinMode(st1_greenLed, OUTPUT);
-  Serial.println(0);  // random number slot — no target for reflex
-  delay(3); //wait for the user to read instructions
-  while (getSt1Distance() > 5 || getSt1Distance() == 0);
+  Serial.println(0);
+  delay(3000);
+
+  while (getReflexDistance() > 5 || getReflexDistance() == 0);
+
   for (int i = 0; i < 3; i++) {
-    digitalWrite(st1_redLed, HIGH);
+    digitalWrite(REFLEX_RED_LED, HIGH);
     delay(700);
-    digitalWrite(st1_redLed, LOW);
+    digitalWrite(REFLEX_RED_LED, LOW);
     delay(700);
   }
+
+  randomSeed(analogRead(0));
   delay(random(1000, 4000));
-  digitalWrite(st1_greenLed, HIGH);
+  digitalWrite(REFLEX_GREEN_LED, HIGH);
   delay(50);
+
   long startTime = millis();
-  int ta2ked_el3ad = 0;
-  while (ta2ked_el3ad < 3) {
-    if (getSt1Distance() > 15) {
-      ta2ked_el3ad++;
+  int confirmed = 0;
+  while (confirmed < 3) {
+    if (getReflexDistance() > 15) {
+      confirmed++;
     } else {
-      ta2ked_el3ad = 0;
+      confirmed = 0;
     }
     delay(5);
   }
-  digitalWrite(st1_greenLed, LOW);
+  digitalWrite(REFLEX_GREEN_LED, LOW);
   long reflexTime = (millis() - startTime) + 50;
   Serial.println(reflexTime);
 }
+
+//===============================================================
+
+void timePerceptionTest() {
+  randomSeed(analogRead(0));
+  int target = random(5, 15);
+  Serial.println(target);
+  delay(3000);
+
+  long gameStartTime = millis();
+  while (digitalRead(TIME_TOUCH) == LOW);
+  long userTouchTime = millis();
+
+  float durationInSeconds = (userTouchTime - gameStartTime) / 1000.0;
+  float difference = abs(durationInSeconds - target);
+  float errorPercent = (difference / target) * 100.0;
+  Serial.println(errorPercent);
+}
+
+//===============================================================
+
 void setup() {
   Serial.begin(9600);
+
+  pinMode(FORCE_DAT,        INPUT);
+  pinMode(FORCE_CLK,        OUTPUT);
+
+  pinMode(DIST_TRIG,        OUTPUT);
+  pinMode(DIST_ECHO,        INPUT);
+
+  pinMode(REFLEX_TRIG,      OUTPUT);
+  pinMode(REFLEX_ECHO,      INPUT);
+  pinMode(REFLEX_RED_LED,   OUTPUT);
+  pinMode(REFLEX_GREEN_LED, OUTPUT);
+
+  pinMode(TIME_TOUCH,       INPUT);
 }
+
 void loop() {
-      if (Serial.available()) {
-        String request = Serial.readStringUntil('\n');
-        request.trim();
-        if (request == "FORCE_TEST") {
-            forceTest();
-        } else if (request == "DISTANCE_TEST") {
-            distanceTest();       // future test
-        }
-        else if(request == "REFLEX_TEST"){
-            reflexTest();
-        }else {
-            Serial.println("BAD_REQUEST");
-        }
-    }
-    // does absolutely nothing until a request arrives
+  if (Serial.available()) {
+    String request = Serial.readStringUntil('\n');
+    request.trim();
+    if      (request == "FORCE_TEST")    forceTest();
+    else if (request == "DISTANCE_TEST") distanceTest();
+    else if (request == "REFLEX_TEST")   reflexTest();
+    else if (request == "TIME_TEST")     timePerceptionTest();
+    else                                 Serial.println("BAD_REQUEST");
+  }
 }
