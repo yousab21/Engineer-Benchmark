@@ -1,7 +1,7 @@
-
-
 import serial
 import time
+import json
+import os
 
 PORT = '/dev/ttyUSB0'
 BAUD = 9600
@@ -13,6 +13,11 @@ time.sleep(2)  # wait for Arduino to finish resetting
 class Utils:
     def clear(self):
         print("\033[H\033[J", end="")
+
+    def print_centered(self, value, end="\n"):
+        width = os.get_terminal_size().columns
+        print(str(value).center(width), end=end)
+
 utils = Utils()
 #========================================
 class Ye_Old_Arduino_Handler:
@@ -21,7 +26,7 @@ class Ye_Old_Arduino_Handler:
     def safeRead(self): #da 3shan bs lw msln el arduino 3ml disconnect fe 2y w2t, el readresponse htde None.
         response = self.readResponse() 
         while response is None:
-            print("Waiting for Arduino...")
+            utils.print_centered("Waiting for Arduino...")
             time.sleep(2)
             response = self.readResponse()
         return float(response)
@@ -34,11 +39,11 @@ class Ye_Old_Arduino_Handler:
                    return line
         
         except serial.SerialException:
-         print("Arduino disconnected!")
+         utils.print_centered("Arduino disconnected!")
          return None
         
         except UnicodeDecodeError:
-         print("Received bad data, retrying..")
+         utils.print_centered("Received bad data, retrying..")
          return self.readResponse()
     
     def sendRequest(self, request):
@@ -47,18 +52,38 @@ class Ye_Old_Arduino_Handler:
 arduino = Ye_Old_Arduino_Handler()
 #========================================
 
+class Ye_Other_Json_Parcer(): #sorry couldnt resist the joke was too good XD
+    def __init__(self):
+        self.filename = "scores.json"
+        
+    def loadScores(self): 
+        try:
+            with open(self.filename, "r") as file:
+                return json.load(file)
+        except FileNotFoundError:
+                return {}
+        
+    def saveScores(self,data): 
+        with open(self.filename, "w") as file:
+            json.dump(data, file, indent=2)
+            
+parcer = Ye_Other_Json_Parcer()
+
+#=======================================
+
 class Test:
 
-    keyWord = "UNKOWN"
-    testName = "UNKOWN"
-    instructions = "UNKOWN"
-    timer = 0
-    randomNumber = 0
-    result = 0
     def __init__(self):
-        pass
+        self.keyWord = "UNKOWN"
+        self.testName = "UNKOWN"
+        self.instructions = "UNKOWN"
+        self.timer = 0
+        self.randomNumber = 0
+        self.result = 0
+
     def getRandomNumber(self):
         self.randomNumber = (arduino.safeRead())
+
     def getResult(self):
         self.result = (arduino.safeRead())
 
@@ -66,10 +91,10 @@ class Test:
         utils.clear()
         print()
         print()
-        print(f"------------------|| {self.testName}")
-        print(f"------------------|| =============================")
-        print(f"------------------|| instructions :")
-        print(f"------------------|| {self.instructions} : [ {self.randomNumber} ]")
+        utils.print_centered(f"{self.testName}")
+        utils.print_centered(f"=====================================")
+        utils.print_centered(f"instructions :")
+        utils.print_centered(f"{self.instructions} : [ {self.randomNumber} ]")
         time.sleep(3)
     
     def countdown(self):
@@ -78,11 +103,11 @@ class Test:
             utils.clear()
             print()
             print()
-            print(f"              ==========")
-            print(f"              ||      ||")
-            print(f"              ||   {i}  ||")
-            print(f"              ||      ||")
-            print(f"              ========= ")
+            utils.print_centered(f"==========")
+            utils.print_centered(f"||      ||")
+            utils.print_centered(f"||   {i}  ||")
+            utils.print_centered(f"||      ||")
+            utils.print_centered(f"========= ")
             i = i - 1
             time.sleep(1)
 
@@ -90,10 +115,10 @@ class Test:
         utils.clear()
         print()
         print()
-        print(f"------------------|| result for {self.testName}")
-        print(f"------------------|| =============================")
-        print(f"------------------|| you were off by {self.result} %")
-        print(f"------------------|| press enter to continue")
+        utils.print_centered(f"result for {self.testName}")
+        utils.print_centered(f"=======================================")
+        utils.print_centered(f"you were off by {self.result} %")
+        utils.print_centered(f"press enter to continue")
         input()
 
     def beginTest(self):
@@ -116,77 +141,100 @@ class DistanceTest(Test):
     testName = "Distance Perception Test"
     instructions = "Raise your hand the following number of cm above the sensor"
     timer = 5
-
-
 class ReflexTest(Test):
     keyWord = "REFLEX_TEST"
     testName = "Reflex Test"
     instructions = "hold your hand above the sensor and remove it when you see the green light"
-    timer = 0 #we dont use this here
+    timer = 0 
 
-    #reflex test works a bit diffrentally then other test so i override those functions
+
     def countdown(self):
         utils.clear()
         print()
         print()
-        print("waiting for you to finish the test")
+        utils.print_centered("waiting for you to finish the test")
         print()
         
     def printResult(self):
         utils.clear()
         print()
         print()
-        print(f"------------------|| result for {self.testName}")
-        print(f"------------------|| =============================")
-        print(f"------------------|| your reflex is {self.result}ms")
-        print(f"------------------|| press enter to continue")
+        utils.print_centered(f"result for {self.testName}")
+        utils.print_centered(f"=============================")
+        utils.print_centered(f"your reflex is {self.result}ms")
+        utils.print_centered(f"press enter to continue")
         input()
+
 
 #===============================================
 class UI:
-    def __init__(self):
-        self.leaderboard = {}
-    
+    def __init__(self): 
+        self.leaderboard = parcer.loadScores()
+
     def welcomeScreen(self):
         utils.clear()
-        print("\n ==== ENGINEER BENCHMARK ====")
+        utils.print_centered("\n ==== ENGINEER BENCHMARK ====")
     
     def getUsername(self):
-        return input("Enter your name (or 'quit' to exit) : ")
+        return input("Enter your name (or 'quit' to exit)")
+
+
+    def showWelcomeBack(self,name, data):
+        utils.print_centered(f"Welcome back {name}!, Your best results are below.")
+        utils.print_centered(f"Force: {data['Station1(F)']:.2f}%")        
+        utils.print_centered(f"Distance: {data['Station2(D)']:.2f}%")        
+        utils.print_centered(f"Reaction: {data['Station3(R)']:.2f}ms")        
+        utils.print_centered(f"AvgScore: {data['AverageScore']:.2f}%")        
+        input("press enter to continue : ")
+
+    def showResults(self, name, errorsList, avg, isNewBest):
+        utils.print_centered(f"\n{name}, your results for this session:")
+        utils.print_centered(f"  Force: {errorsList[0]:.2f}%")
+        utils.print_centered(f"  Distance: {errorsList[1]:.2f}%")
+        utils.print_centered(f"  Reaction: {errorsList[2]:.2f}ms")
+        utils.print_centered(f"  Average: {avg:.2f}%")
+        if isNewBest:
+            utils.print_centered("New personal best!")
+        input("press enter to continue :")
     
-    def showWelcomeBack(self, name, best_score):
-        print(f"Welcome back {name}! Your best accuracy is {(best_score):.2f} % !")
-    
-    
-    def showResults(self, name, avg, is_new_best):
-        print(f"\n{name} your accuracy is {(avg):.2f}%")
-        if is_new_best:
-            print("New personal best!")
-    
-    
+
+    def showLeaderboardHeader(self):
+        header  = f"{'Name':<12} | {'Force%':>8} | {'Distance%':>9} | {'Reaction(ms)':>12} | {'Average%':>8}"
+        divider = "-" * len(header)
+        utils.print_centered(header)
+        utils.print_centered(divider)
+
     def displayLeaderboard(self):
+        utils.print_centered("============ Leaderboard ==============")
         if not self.leaderboard:
-            print("\n ==== Leaderboard ====")
-            print(" No scores yet.")
-            #kan fi heda bas bug eno hydisplay el leadebaords for 10ms we yed5ol 3la el ba3do
+            utils.print_centered("No scores yet.")
             input("Press enter for new participant...")
             return
-        sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1])
-        print("\n ==== Leaderboard ====")
-        for i, (name, score) in enumerate(sortedScores, 1):
-           print(f"{i}, {name}: {(score):.2f}%")
-        print("=============================")
 
-    def updateLeaderboard(self, name, score):
-        if name not in self.leaderboard or score < self.leaderboard[name]:
-             self.leaderboard[name] = (score)
-             return True
-        return False
+        sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1]["AverageScore"])
+        self.showLeaderboardHeader()
+        for i, (name, data) in enumerate(sortedScores, 1):
+            row = f"{f'{i}. {name}':<12} | {data['Station1(F)']:>8.2f} | {data['Station2(D)']:>9.2f} | {data['Station3(R)']:>12.2f} | {data['AverageScore']:>8.2f}"
+            utils.print_centered(row)
 
+    input("Press enter for new participant...")
 
+    def updateLeaderboard(self, name, errorsList, avgScore):
+        if name not in self.leaderboard or avgScore < self.leaderboard[name]["AverageScore"]:
+            self.leaderboard[name] = {
+                "Station1(F)": errorsList[0],
+                "Station2(D)": errorsList[1],
+                "Station3(R)": errorsList[2],
+                "AverageScore": avgScore
+            }
+            parcer.saveScores(self.leaderboard)
+            return True
+        return False   
+#==========================================
 
 def main():
     ui = UI()
+
     while True:
         ui.welcomeScreen()
         name = ui.getUsername()
@@ -197,15 +245,16 @@ def main():
             ui.showWelcomeBack(name, ui.leaderboard[name])
         
         # running tests
-        tests = [ForceTest() , DistanceTest() , ReflexTest() ] 
-        errors = []
+        tests = [ForceTest(), DistanceTest(),ReflexTest()]
+        results = []
         for test in tests:
            test.beginTest()
-           errors.append(test.result)
-        avg = sum(errors)/len(errors)
-        
-        newBest = ui.updateLeaderboard(name, avg)
-        ui.showResults(name, avg, newBest)
+           results.append(test.result)
+        avg = (results[0]+results[1])/2 #hna ana shelt mwdo3 el len da 7alyn 3shan el reflextest asln msh error fna msh 3arf a3ml fe7 eh 7alyn 
+        newBest = ui.updateLeaderboard(name,results, avg)
+        ui.showResults(name,results, avg, newBest)
         ui.displayLeaderboard()
+
 if __name__ == "__main__":
     main()
+    
