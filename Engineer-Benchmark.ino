@@ -35,8 +35,7 @@ void forceTest(){
   forceSensor.tare();
   forceSensor.set_scale(calibrationFactorNewtons);
 
-  randomSeed(analogRead(0));
-  int randomNumber = random(0, 10);
+  int randomNumber = random(1, 10);
   Serial.println(randomNumber);
   delay(3000);
 
@@ -53,8 +52,7 @@ void forceTest(){
 //===============================================================
 
 void distanceTest(){
-  randomSeed(analogRead(0));
-  int randomNum = random(10, 80);
+  int randomNum = random(5, 25);
   Serial.println(randomNum);
   delay(3000);
 
@@ -72,7 +70,7 @@ void distanceTest(){
     delay(1000);
   }
   float distance = sum / 5;
-  float relativeError = abs((randomNum - distance) / randomNum);
+  float relativeError = abs((randomNum - distance) / randomNum) * 100;
   Serial.println(relativeError);
 }
 
@@ -102,7 +100,6 @@ void reflexTest() {
     delay(700);
   }
 
-  randomSeed(analogRead(0));
   delay(random(1000, 4000));
   digitalWrite(REFLEX_GREEN_LED, HIGH);
   delay(50);
@@ -125,8 +122,7 @@ void reflexTest() {
 //===============================================================
 
 void timePerceptionTest() {
-  randomSeed(analogRead(0));
-  int target = random(5, 15);
+  int target = random(2,15);
   Serial.println(target);
   delay(3000);
 
@@ -143,7 +139,6 @@ void timePerceptionTest() {
 //===============================================================
 
 void anglePerceptionTest(){
-  randomSeed(analogRead(0));
   bool positive = random(0, 2);
   int randomAngle;
   if (positive) {
@@ -178,6 +173,7 @@ void anglePerceptionTest(){
 
 void setup() {
   Serial.begin(9600);
+  randomSeed(analogRead(0));
 
   pinMode(FORCE_DAT,        INPUT);
   pinMode(FORCE_CLK,        OUTPUT);
@@ -202,6 +198,6 @@ void loop() {
     else if (request == "REFLEX_TEST")   reflexTest();
     else if (request == "TIME_TEST")     timePerceptionTest();
     else if (request == "ANGLE_TEST")    anglePerceptionTest();
-    else                                 Serial.println("BAD_REQUEST");
+    else {Serial.println("BAD_REQUEST");}
   }
 }

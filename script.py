@@ -6,9 +6,6 @@ import os
 PORT = '/dev/ttyUSB0'
 BAUD = 9600
 
-ser = serial.Serial(PORT, BAUD, timeout=5)
-time.sleep(2)  # wait for Arduino to finish resetting
-
 #=======================================
 class Utils:
     def clear(self):
@@ -21,74 +18,79 @@ class Utils:
 utils = Utils()
 #========================================
 class Ye_Old_Arduino_Handler:
-    def __init__(self):
-        return
+    def __init__(self, ser):
+        self.ser = ser
+
     def safeRead(self):
-        response = self.readResponse() 
+        response = self.readResponse()
         while response is None:
             utils.print_centered("Waiting for Arduino...")
             time.sleep(2)
             response = self.readResponse()
+        if "ERROR" in response:
+            utils.print_centered(f"Sensor error: {response}")
+            return 0.0
         return float(response)
-    
+
     def readResponse(self):
         try:
-            while(True):
-                line = ser.readline().decode('utf-8').strip()
+            attempts = 0
+            while attempts < 10:
+                line = self.ser.readline().decode('utf-8').strip()
                 if line:
-                   return line
-        
+                    return line
+                attempts += 1
+            utils.print_centered("Timed out waiting for Arduino.")
+            return None
         except serial.SerialException:
-         utils.print_centered("Arduino disconnected!")
-         return None
-        
+            utils.print_centered("Arduino disconnected!")
+            return None
         except UnicodeDecodeError:
-         utils.print_centered("Received bad data, retrying..")
-         return self.readResponse()
-    
+            utils.print_centered("Received bad data, retrying..")
+            return self.readResponse()
+
     def sendRequest(self, request):
-        ser.write(f'{request}\n'.encode())
+        self.ser.reset_input_buffer()
+        self.ser.write(f'{request}\n'.encode())
 
-arduino = Ye_Old_Arduino_Handler()
 #========================================
-
 class Ye_Other_Json_Parcer():
     def __init__(self):
         self.filename = "scores.json"
-        
-    def loadScores(self): 
+
+    def loadScores(self):
         try:
             with open(self.filename, "r") as file:
                 return json.load(file)
         except FileNotFoundError:
-                return {}
-        
-    def saveScores(self, data): 
+            return {}
+
+    def saveScores(self, data):
         with open(self.filename, "w") as file:
             json.dump(data, file, indent=2)
 
     def deleteEverything(self):
         self.saveScores({})
-            
+
 parcer = Ye_Other_Json_Parcer()
-
 #=======================================
-
 class Test:
-
-    def __init__(self):
-        self.keyWord = "UNKOWN"
-        self.testName = "UNKOWN"
-        self.instructions = "UNKOWN"
-        self.timer = 0
+    def __init__(self, arduino):
+        self.arduino = arduino
         self.randomNumber = 0
         self.result = 0
-
+        try:
+            self.keyWord = getattr(self.__class__, "keyWord")
+            self.testName = getattr(self.__class__, "testName")
+            self.instructions = getattr(self.__class__, "instructions")
+            self.timer = getattr(self.__class__, "timer")
+        except AttributeError as e:
+            raise Exception(f"{self.__class__.__name__} is missing required attribute: {e}")
     def getRandomNumber(self):
-        self.randomNumber = arduino.safeRead()
+        self.randomNumber = self.arduino.safeRead()
 
     def getResult(self):
-        self.result = arduino.safeRead()
+        self.result = self.arduino.safeRead()
 
     def printInstructions(self):
         utils.clear()
@@ -99,7 +101,7 @@ class Test:
         utils.print_centered(f"instructions :")
         utils.print_centered(f"{self.instructions} : [ {self.randomNumber} ]")
         time.sleep(3)
-    
+
     def countdown(self):
         i = self.timer
         while i > 0:
@@ -125,7 +127,7 @@ class Test:
         input()
 
     def beginTest(self):
-        arduino.sendRequest(self.keyWord)
+        self.arduino.sendRequest(self.keyWord)
         self.getRandomNumber()
         self.printInstructions()
         self.countdown()
@@ -151,13 +153,6 @@ class ReflexTest(Test):
     instructions = "hold your hand above the sensor and remove it when you see the green light"
     timer = 0
 
-    def countdown(self):
-        utils.clear()
-        print()
-        print()
-        utils.print_centered("waiting for you to finish the test")
-        print()
-        
     def printResult(self):
         utils.clear()
         print()
@@ -168,18 +163,19 @@ class ReflexTest(Test):
         utils.print_centered(f"press enter to continue")
         input()
 
-class TimePerceptionTest(Test):
-    keyWord = "TIME_TEST"
-    testName = "Time Perception Test"
-    instructions = "count the following number of seconds in your head then tap the sensor"
-    timer = 0
-
     def countdown(self):
         utils.clear()
         print()
         print()
-        utils.print_centered("test running — tap when you think time is up!")
+        utils.print_centered("test running — FOCUS UP !")
         print()
+
+class TimePerceptionTest(Test):
+    keyWord = "TIME_TEST"
+    testName = "Time Perception Test"
+    instructions = "count the following number of seconds in your head then tap the sensor"
+    timer = 3
+
 
 class AnglePerceptionTest(Test):
     keyWord = "ANGLE_TEST"
@@ -199,25 +195,25 @@ class AnglePerceptionTest(Test):
 
 #===============================================
 class UI:
-    def __init__(self): 
+    def __init__(self):
         self.leaderboard = parcer.loadScores()
 
     def welcomeScreen(self):
         utils.clear()
         utils.print_centered("=========== ENGINEER BENCHMARK =============")
-    
+
     def getUsername(self):
-        utils.print_centered(f"Enter your name (or 'quit' to exit): " , end="")
+        utils.print_centered(f"Enter your name (or 'quit' to exit): ", end="")
         return input()
 
     def showWelcomeBack(self, name, data):
         utils.print_centered(f"Welcome back {name}!, Your best results are below.")
-        utils.print_centered(f"Force:      {data['Station1(F)']:.2f}%")        
-        utils.print_centered(f"Distance:   {data['Station2(D)']:.2f}%")        
-        utils.print_centered(f"Reaction:   {data['Station3(R)']:.2f}ms")        
+        utils.print_centered(f"Force:      {data['Station1(F)']:.2f}%")
+        utils.print_centered(f"Distance:   {data['Station2(D)']:.2f}%")
+        utils.print_centered(f"Reaction:   {data['Station3(R)']:.2f}ms")
         utils.print_centered(f"Time:       {data['Station4(T)']:.2f}%")
         utils.print_centered(f"Angle:      {data['Station5(A)']:.2f}%")
-        utils.print_centered(f"AvgScore:   {data['AverageScore']:.2f}%")        
+        utils.print_centered(f"AvgScore:   {data['AverageScore']:.2f}%")
         utils.print_centered(f"press enter to continue : ")
         input()
 
@@ -270,32 +266,41 @@ class UI:
         return False
 
 #==========================================
-
 def main():
+    print("Connecting to Arduino...")
+    ser = serial.Serial(PORT, BAUD, timeout=5)
+    time.sleep(10)
+    ser.reset_input_buffer()
+    print("Connected!")
+
+    arduino = Ye_Old_Arduino_Handler(ser)
     ui = UI()
 
-    while True:
-        ui.welcomeScreen()
-        name = ui.getUsername()
+    try:
+        while True:
+            ui.welcomeScreen()
+            name = ui.getUsername()
 
-        if name.lower() == "quit":
-            break
-        if name in ui.leaderboard:
-            ui.showWelcomeBack(name, ui.leaderboard[name])
-        
-        tests = [ForceTest(), DistanceTest(), ReflexTest(), TimePerceptionTest(), AnglePerceptionTest()]
-        results = []
-        for test in tests:
-            test.beginTest()
-            results.append(test.result)
+            if name.lower() == "quit":
+                break
+            if name in ui.leaderboard:
+                ui.showWelcomeBack(name, ui.leaderboard[name])
 
-        avg = (results[0] + results[1] + results[3] + results[4]) / 4  # force + distance + time + angle, reflex excluded
-        newBest = ui.updateLeaderboard(name, results, avg)
-        ui.showResults(name, results, avg, newBest)
-        ui.displayLeaderboard()
+            tests = [ForceTest(arduino), DistanceTest(arduino), ReflexTest(arduino), TimePerceptionTest(arduino), AnglePerceptionTest(arduino)]
+            results = []
+            for test in tests:
+                test.beginTest()
+                results.append(test.result)
+
+            avg = (results[0] + results[1] + results[3] + results[4]) / 4
+            newBest = ui.updateLeaderboard(name, results, avg)
+            ui.showResults(name, results, avg, newBest)
+            ui.displayLeaderboard()
+    finally:
+        ser.close()
 
 if __name__ == "__main__":
-    main()
+   main()
 
 #for testing
 #parcer.deleteEverything()
