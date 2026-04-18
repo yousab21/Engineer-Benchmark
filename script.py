@@ -2,6 +2,8 @@ import serial
 import time
 import json
 import os
+from colorama import Fore, Back, Style, init
+init()
 
 PORT = '/dev/ttyUSB0'
 BAUD = 9600
@@ -16,6 +18,21 @@ class Utils:
         print(str(value).center(width), end=end)
 
 utils = Utils()
+
+#=======================================
+def reflexColor(score):
+    if score < 200:   return Fore.GREEN
+    elif score < 300: return Fore.YELLOW
+    else:             return Fore.RED
+
+def percentColor(score):
+    if score >= 90:   return Fore.GREEN
+    elif score >= 75: return Fore.YELLOW
+    else:             return Fore.RED
+
+# Order: Reflex, Force, Distance, Angle, Time
+SCORE_COLORS = [reflexColor, percentColor, percentColor, percentColor, percentColor]
+
 #========================================
 class Ye_Old_Arduino_Handler:
     def __init__(self, ser):
@@ -54,7 +71,7 @@ class Ye_Old_Arduino_Handler:
         self.ser.write(f'{request}\n'.encode())
 
 #========================================
-class Ye_Other_Json_Parcer():
+class Ye_Other_Json_Parcer:
     def __init__(self):
         self.filename = "scores.json"
 
@@ -69,28 +86,86 @@ class Ye_Other_Json_Parcer():
         with open(self.filename, "w") as file:
             json.dump(data, file, indent=2)
 
-    def deleteEverything(self):
-        self.saveScores({})
-
 parcer = Ye_Other_Json_Parcer()
+
+#=========================================
+class Admin:
+    def __init__(self, ui):
+        self.adminPassword = "5G6E74"
+        self.ui = ui
+
+    def deleteEverything(self):
+        parcer.saveScores({})
+
+    def deleteUser(self, name):
+        data = parcer.loadScores()
+        if name in data:
+            del data[name]
+            parcer.saveScores(data)
+            return True
+        return False
+
+    def verifyPassword(self):
+        utils.print_centered("Enter password: ")
+        password = input()
+        if password != self.adminPassword:
+            utils.print_centered("Invalid password, returning to menu.")
+            return False
+        return True
+
+    def adminScreen(self):
+        utils.clear()
+        utils.print_centered(f"{Style.BRIGHT}{Back.WHITE}{Fore.RED}=== Admin Mode ==={Style.RESET_ALL}")
+        utils.print_centered(f"{Back.GREEN}{Fore.YELLOW}Enter a number..{Style.RESET_ALL}")
+        utils.print_centered(f"{Back.GREEN}1. Delete a user{Style.RESET_ALL}")
+        utils.print_centered(f"{Back.GREEN}2. Empty the leaderboard{Style.RESET_ALL}")
+        utils.print_centered(f"{Back.GREEN}3. Return to menu{Style.RESET_ALL}")
+
+        while True:
+            adminAns = input()
+            if adminAns == "3":
+                break
+            elif adminAns == "2":
+                if not self.ui.leaderboard:
+                    utils.print_centered("Leaderboard is already empty.")
+                else:
+                    self.deleteEverything()
+                    self.ui.leaderboard = {}
+                    utils.print_centered("Leaderboard cleared.")
+            elif adminAns == "1":
+                utils.print_centered("Enter the name of the user:")
+                name = input()
+                if self.deleteUser(name.lower()):
+                    del self.ui.leaderboard[name.lower()]
+                    utils.print_centered(f"{name} deleted successfully.")
+                else:
+                    utils.print_centered("User not found.")
+
 #=======================================
 class Test:
     def __init__(self, arduino):
         self.arduino = arduino
         self.randomNumber = 0
-        self.result = 0
+        self.error = 0
         try:
-            self.keyWord = getattr(self.__class__, "keyWord")
-            self.testName = getattr(self.__class__, "testName")
+            self.keyWord     = getattr(self.__class__, "keyWord")
+            self.testName    = getattr(self.__class__, "testName")
             self.instructions = getattr(self.__class__, "instructions")
-            self.timer = getattr(self.__class__, "timer")
+            self.timer       = getattr(self.__class__, "timer")
+            self.goodScore       = getattr(self.__class__, "goodScore")
+            self.okScore       = getattr(self.__class__, "okScore")
+            self.badScore      = getattr(self.__class__, "badScore")
         except AttributeError as e:
             raise Exception(f"{self.__class__.__name__} is missing required attribute: {e}")
+
+    def calculateScore(self):
+        return max(0, 100 - self.error)
+
     def getRandomNumber(self):
         self.randomNumber = self.arduino.safeRead()
 
     def getResult(self):
-        self.result = self.arduino.safeRead()
+        self.error = self.arduino.safeRead()
 
     def printInstructions(self):
         utils.clear()
@@ -116,13 +191,33 @@ class Test:
             i -= 1
             time.sleep(1)
 
+    def bullyParticipant(self):
+        print()
+        if (self.calculateScore() > 90):
+            utils.print_centered(f"{Style.BRIGHT}{Fore.GREEN}{self.goodScore}{Style.RESET_ALL}")
+
+        elif (self.calculateScore() > 75):
+            utils.print_centered(f"{Style.BRIGHT}{Fore.YELLOW}{self.okScore}{Style.RESET_ALL}")
+
+        else:
+            utils.print_centered(f"{Style.BRIGHT}{Fore.RED}{self.badScore}{Style.RESET_ALL}")
+        print()
+
+
     def printResult(self):
+        accuracy = max(0, 100 - self.error)
+        color = percentColor(accuracy)
+
         utils.clear()
         print()
         print()
         utils.print_centered(f"result for {self.testName}")
         utils.print_centered(f"=======================================")
-        utils.print_centered(f"you were off by {self.result} %")
+
+        plainText = f"you were {accuracy}% correct"
+        width = os.get_terminal_size().columns
+        print(plainText.center(width).replace(str(accuracy), f"{Style.BRIGHT}{color}{accuracy}{Style.RESET_ALL}"))
+        self.bullyParticipant()
         utils.print_centered(f"press enter to continue")
         input()
 
@@ -135,33 +230,17 @@ class Test:
         self.printResult()
 
 
-class ForceTest(Test):
-    keyWord = "FORCE_TEST"
-    testName = "Force Perception Test"
-    instructions = "apply the following number of newtons on the hook"
-    timer = 5
-
-class DistanceTest(Test):
-    keyWord = "DISTANCE_TEST"
-    testName = "Distance Perception Test"
-    instructions = "Raise your hand the following number of cm above the sensor"
-    timer = 5
-
 class ReflexTest(Test):
     keyWord = "REFLEX_TEST"
     testName = "Reflex Test"
     instructions = "hold your hand above the sensor and remove it when you see the green light"
     timer = 0
+    goodScore = "looks like we have a professional gamer on our hand !"
+    okScore = "not too slow, not to fast, you hand are just... there"
+    badScore = "have you had breakfast yet?, WAKE UP GRANDPA !"
 
-    def printResult(self):
-        utils.clear()
-        print()
-        print()
-        utils.print_centered(f"result for {self.testName}")
-        utils.print_centered(f"=============================")
-        utils.print_centered(f"your reflex is {self.result}ms")
-        utils.print_centered(f"press enter to continue")
-        input()
+    def calculateScore(self):
+        return self.error
 
     def countdown(self):
         utils.clear()
@@ -170,11 +249,55 @@ class ReflexTest(Test):
         utils.print_centered("test running — FOCUS UP !")
         print()
 
-class TimePerceptionTest(Test):
-    keyWord = "TIME_TEST"
-    testName = "Time Perception Test"
-    instructions = "count the following number of seconds in your head then tap the sensor"
-    timer = 3
+    def bullyParticipant(self):
+        print()
+        if (self.calculateScore() < 200):
+            utils.print_centered(f"{Style.BRIGHT}{Fore.GREEN}{self.goodScore}{Style.RESET_ALL}")
+
+        elif (self.calculateScore() < 300):
+            utils.print_centered(f"{Style.BRIGHT}{Fore.YELLOW}{self.okScore}{Style.RESET_ALL}")
+
+        else:
+            utils.print_centered(f"{Style.BRIGHT}{Fore.RED}{self.badScore}{Style.RESET_ALL}")
+        print()
+
+
+    def printResult(self):
+        reflex = self.error
+        color = reflexColor(reflex)
+
+        utils.clear()
+        print()
+        print()
+        utils.print_centered(f"result for {self.testName}")
+        utils.print_centered(f"=======================================")
+
+        plainText = f"your reaction time: {reflex}ms"
+        width = os.get_terminal_size().columns
+        print(plainText.center(width).replace(str(reflex), f"{Style.BRIGHT}{color}{reflex}{Style.RESET_ALL}"))
+        self.bullyParticipant()
+        utils.print_centered(f"press enter to continue")
+        input()
+
+
+class ForceTest(Test):
+    keyWord = "FORCE_TEST"
+    testName = "Force Perception Test"
+    instructions = "apply the following number of newtons on the hook"
+    timer = 5
+    goodScore = "NASA-grade touch !"
+    okScore = "the force you applied is... there"
+    badScore = "Newton is lucky to be dead at this point"
+
+
+class DistanceTest(Test):
+    keyWord = "DISTANCE_TEST"
+    testName = "Distance Perception Test"
+    instructions = "Raise your hand the following number of cm above the sensor"
+    timer = 5
+    goodScore = "ISP-certified eyeballing"
+    okScore = "that was as accurate as most of our prep year drawings tbh"
+    badScore = "you fabricated a lot of drawing in prep year, didn't you?"
 
 
 class AnglePerceptionTest(Test):
@@ -182,16 +305,26 @@ class AnglePerceptionTest(Test):
     testName = "Angle Perception Test"
     instructions = "tilt the device to the following angle in degrees"
     timer = 5
+    goodScore = "cleaner than a CAD constraint !"
+    okScore = "close enough, for a rough sketch"
+    badScore = "radiands? degrees? well you chose neither !"
 
-    def printResult(self):
+
+class TimePerceptionTest(Test):
+    keyWord = "TIME_TEST"
+    testName = "Time Perception Test"
+    instructions = "count the following number of seconds in your head then tap the sensor"
+    timer = 0
+    goodScore = "atomic clock behavior !"
+    okScore = "RealTime? more like sometimes"
+    badScore = "bro lags as if he was on egyptian WIFI !"
+
+    def countdown(self):
         utils.clear()
         print()
         print()
-        utils.print_centered(f"result for {self.testName}")
-        utils.print_centered(f"=======================================")
-        utils.print_centered(f"you were off by {self.result} %")
-        utils.print_centered(f"press enter to continue")
-        input()
+        utils.print_centered(f"{Fore.GREEN}timer started, KEEP FOCUS !{Style.RESET_ALL}")
+        print()
 
 #===============================================
 class UI:
@@ -201,29 +334,37 @@ class UI:
     def welcomeScreen(self):
         utils.clear()
         utils.print_centered("=========== ENGINEER BENCHMARK =============")
+        utils.print_centered("Enter a number.")
+        utils.print_centered("1. Begin Trials")
+        utils.print_centered("2. View Leaderboard")
+        utils.print_centered("3. Enter Admin mode.")
+        return input()
 
     def getUsername(self):
         utils.print_centered(f"Enter your name (or 'quit' to exit): ", end="")
         return input()
 
     def showWelcomeBack(self, name, data):
-        utils.print_centered(f"Welcome back {name}!, Your best results are below.")
-        utils.print_centered(f"Force:      {data['Station1(F)']:.2f}%")
-        utils.print_centered(f"Distance:   {data['Station2(D)']:.2f}%")
-        utils.print_centered(f"Reaction:   {data['Station3(R)']:.2f}ms")
-        utils.print_centered(f"Time:       {data['Station4(T)']:.2f}%")
-        utils.print_centered(f"Angle:      {data['Station5(A)']:.2f}%")
+        utils.print_centered(f"Welcome back {name}! Your best results are below.")
+        utils.print_centered(f"Reaction:   {data['Station1(R)']:.2f}ms")
+        utils.print_centered(f"Force:      {data['Station2(F)']:.2f}%")
+        utils.print_centered(f"Distance:   {data['Station3(D)']:.2f}%")
+        utils.print_centered(f"Angle:      {data['Station4(A)']:.2f}%")
+        utils.print_centered(f"Time:       {data['Station5(T)']:.2f}%")
         utils.print_centered(f"AvgScore:   {data['AverageScore']:.2f}%")
         utils.print_centered(f"press enter to continue : ")
         input()
 
-    def showResults(self, name, errorsList, avg, isNewBest):
+    def showResults(self, name, scoresList, avg, isNewBest):
         utils.print_centered(f"{name}, your results for this session:")
-        utils.print_centered(f"Force:      {errorsList[0]:.2f}%")
-        utils.print_centered(f"Distance:   {errorsList[1]:.2f}%")
-        utils.print_centered(f"Reaction:   {errorsList[2]:.2f}ms")
-        utils.print_centered(f"Time:       {errorsList[3]:.2f}%")
-        utils.print_centered(f"Angle:      {errorsList[4]:.2f}%")
+        labels = ["Reaction:", "Force:   ", "Distance:", "Angle:   ", "Time:    "]
+        units  = ["ms",        "%",         "%",         "%",         "%"        ]
+        for i, (score, label, unit) in enumerate(zip(scoresList, labels, units)):
+            color = SCORE_COLORS[i](score)
+            plainText = f"{label}  {score:.2f}{unit}"
+            width = os.get_terminal_size().columns
+            scoreStr = f"{score:.2f}"
+            print(plainText.center(width).replace(scoreStr, f"{Style.BRIGHT}{color}{scoreStr}{Style.RESET_ALL}"))
         utils.print_centered(f"Average:    {avg:.2f}%")
         if isNewBest:
             utils.print_centered("New personal best!")
@@ -231,7 +372,7 @@ class UI:
         input()
 
     def showLeaderboardHeader(self):
-        header  = f"{'Name':<12} | {'Force%':>8} | {'Distance%':>9} | {'Reaction(ms)':>12} | {'Time%':>7} | {'Angle%':>7} | {'Average%':>8}"
+        header  = f"{'Name':<12} | {'Reaction(ms)':>12} | {'Force%':>8} | {'Distance%':>9} | {'Angle%':>7} | {'Time%':>7} | {'Average%':>8}"
         divider = "-" * len(header)
         utils.print_centered(header)
         utils.print_centered(divider)
@@ -240,25 +381,37 @@ class UI:
         utils.print_centered("============ Leaderboard ==============")
         if not self.leaderboard:
             utils.print_centered("No scores yet.")
-            utils.print_centered(f"Press enter for new participant...")
+            utils.print_centered("Press enter for new participant...")
             input()
             return
         sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1]["AverageScore"])
         self.showLeaderboardHeader()
         for i, (name, data) in enumerate(sortedScores, 1):
-            row = f"{f'{i}. {name}':<12} | {data['Station1(F)']:>8.2f} | {data['Station2(D)']:>9.2f} | {data['Station3(R)']:>12.2f} | {data['Station4(T)']:>7.2f} | {data['Station5(A)']:>7.2f} | {data['AverageScore']:>8.2f}"
+            scores = [data['Station1(R)'], data['Station2(F)'], data['Station3(D)'], data['Station4(A)'], data['Station5(T)']]
+            coloredCols = []
+            for j, score in enumerate(scores):
+                color = SCORE_COLORS[j](score)
+                coloredCols.append(f"{Style.BRIGHT}{color}{score:.2f}{Style.RESET_ALL}")
+            row = (f"{f'{i}. {name.capitalize()}':<12} | "
+                   f"{coloredCols[0]:>12} | "
+                   f"{coloredCols[1]:>8} | "
+                   f"{coloredCols[2]:>9} | "
+                   f"{coloredCols[3]:>7} | "
+                   f"{coloredCols[4]:>7} | "
+                   f"{data['AverageScore']:>8.2f}")
             utils.print_centered(row)
-        utils.print_centered(f"Press enter for new participant...")
+        utils.print_centered("Press enter for new participant...")
         input()
 
-    def updateLeaderboard(self, name, errorsList, avgScore):
+    def updateLeaderboard(self, name, scoresList, avgScore):
+        name = name.lower()
         if name not in self.leaderboard or avgScore < self.leaderboard[name]["AverageScore"]:
             self.leaderboard[name] = {
-                "Station1(F)": errorsList[0],
-                "Station2(D)": errorsList[1],
-                "Station3(R)": errorsList[2],
-                "Station4(T)": errorsList[3],
-                "Station5(A)": errorsList[4],
+                "Station1(R)": scoresList[0],
+                "Station2(F)": scoresList[1],
+                "Station3(D)": scoresList[2],
+                "Station4(A)": scoresList[3],
+                "Station5(T)": scoresList[4],
                 "AverageScore": avgScore
             }
             parcer.saveScores(self.leaderboard)
@@ -275,32 +428,54 @@ def main():
 
     arduino = Ye_Old_Arduino_Handler(ser)
     ui = UI()
+    admin = Admin(ui)
 
     try:
         while True:
-            ui.welcomeScreen()
-            name = ui.getUsername()
+            while True:
+                ans = ui.welcomeScreen()
+                if ans == "1":
+                    break
+                elif ans == "2":
+                    ui.displayLeaderboard()
+                    utils.print_centered("Returning to menu...")
+                    time.sleep(2)
+                elif ans == "3":
+                    if admin.verifyPassword():
+                        admin.adminScreen()
+                else:
+                    utils.print_centered("Invalid input, try again.")
 
-            if name.lower() == "quit":
-                break
+            while True:
+                utils.clear()
+                name = ui.getUsername()
+                name = name.lower()
+                if name == "quit": break
+                if name.strip() != "": break
+                utils.print_centered("Name cannot be empty. Try again.")
+                time.sleep(2)
+            if name == "quit": break
+
             if name in ui.leaderboard:
-                ui.showWelcomeBack(name, ui.leaderboard[name])
+                ui.showWelcomeBack(name.capitalize(), ui.leaderboard[name])
 
-            tests = [ForceTest(arduino), DistanceTest(arduino), ReflexTest(arduino), TimePerceptionTest(arduino), AnglePerceptionTest(arduino)]
+            tests = [ReflexTest(arduino), ForceTest(arduino), DistanceTest(arduino), AnglePerceptionTest(arduino), TimePerceptionTest(arduino)]
             results = []
             for test in tests:
+                utils.print_centered("Test beginning in 5 seconds, Get Ready.")
+                time.sleep(5)
                 test.beginTest()
-                results.append(test.result)
+                results.append(test.calculateScore())
 
-            avg = (results[0] + results[1] + results[3] + results[4]) / 4
+            avg = (results[1] + results[2] + results[3] + results[4]) / 4
             newBest = ui.updateLeaderboard(name, results, avg)
-            ui.showResults(name, results, avg, newBest)
+            ui.showResults(name.capitalize(), results, avg, newBest)
             ui.displayLeaderboard()
+
     finally:
+        utils.clear()
+        utils.print_centered("Exiting the ENGINEER BENCHMARK. Goodbye.")
         ser.close()
 
 if __name__ == "__main__":
-   main()
-
-#for testing
-#parcer.deleteEverything()
+    main()
