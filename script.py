@@ -91,7 +91,7 @@ parcer = Ye_Other_Json_Parcer()
 #=========================================
 class Admin:
     def __init__(self, ui):
-        self.adminPassword = "5G6E74"
+        self.adminPassword = "AOOYY" #our initials (ahmad omar omar yehia yousab)
         self.ui = ui
 
     def deleteEverything(self):
@@ -372,7 +372,7 @@ class UI:
         input()
 
     def showLeaderboardHeader(self):
-        header  = f"{'Name':<12} | {'Reaction(ms)':>12} | {'Force%':>8} | {'Distance%':>9} | {'Angle%':>7} | {'Time%':>7} | {'Average%':>8}"
+        header  = f"{'Name':<20} | {'Reaction(ms)':>12} | {'Force%':>12} | {'Distance%':>12} | {'Angle%':>12} | {'Time%':>12} | {'Average%':>12}"
         divider = "-" * len(header)
         utils.print_centered(header)
         utils.print_centered(divider)
@@ -388,17 +388,20 @@ class UI:
         self.showLeaderboardHeader()
         for i, (name, data) in enumerate(sortedScores, 1):
             scores = [data['Station1(R)'], data['Station2(F)'], data['Station3(D)'], data['Station4(A)'], data['Station5(T)']]
+            widths = [12, 12, 12, 12, 12]
             coloredCols = []
-            for j, score in enumerate(scores):
+            for j, (score, w) in enumerate(zip(scores, widths)):
                 color = SCORE_COLORS[j](score)
-                coloredCols.append(f"{Style.BRIGHT}{color}{score:.2f}{Style.RESET_ALL}")
-            row = (f"{f'{i}. {name.capitalize()}':<12} | "
-                   f"{coloredCols[0]:>12} | "
-                   f"{coloredCols[1]:>8} | "
-                   f"{coloredCols[2]:>9} | "
-                   f"{coloredCols[3]:>7} | "
-                   f"{coloredCols[4]:>7} | "
-                   f"{data['AverageScore']:>8.2f}")
+                plain = f"{score:.2f}"
+                padded = plain.rjust(w)
+                coloredCols.append(f"{Style.BRIGHT}{color}{padded}{Style.RESET_ALL}")
+            row = (f"{f'{i}. {name.capitalize()}':<20} | "
+                   f"{coloredCols[0]} | "
+                   f"{coloredCols[1]} | "
+                   f"{coloredCols[2]} | "
+                   f"{coloredCols[3]} | "
+                   f"{coloredCols[4]} | "
+                   f"{data['AverageScore']:>12.2f}")
             utils.print_centered(row)
         utils.print_centered("Press enter for new participant...")
         input()
