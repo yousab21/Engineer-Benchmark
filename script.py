@@ -341,6 +341,7 @@ class UI:
         return input()
 
     def getUsername(self):
+        utils.clear()
         utils.print_centered(f"Enter your name (or 'quit' to exit): ", end="")
         return input()
 
@@ -356,6 +357,7 @@ class UI:
         input()
 
     def showResults(self, name, scoresList, avg, isNewBest):
+        utils.clear()
         utils.print_centered(f"{name}, your results for this session:")
         labels = ["Reaction:", "Force:   ", "Distance:", "Angle:   ", "Time:    "]
         units  = ["ms",        "%",         "%",         "%",         "%"        ]
@@ -378,6 +380,7 @@ class UI:
         utils.print_centered(divider)
 
     def displayLeaderboard(self):
+        utils.clear()
         utils.print_centered("============ Leaderboard ==============")
         if not self.leaderboard:
             utils.print_centered("No scores yet.")
