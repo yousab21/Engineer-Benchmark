@@ -5,7 +5,8 @@ import os
 from colorama import Fore, Back, Style, init
 init()
 
-PORT = '/dev/ttyUSB0'
+#PORT = '/dev/ttyUSB0'
+PORT = '/dev/ttyACM0'
 BAUD = 9600
 
 #=======================================

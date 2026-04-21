@@ -24,16 +24,18 @@
 //the library those comments are just for us when we assemble the project
 // SDA -> A4 
 // SCL -> A5
+int16_t ax_offset = 0;  // <-- add this near the top with your defines
+MPU6050 mpu;
 
 //===============================================================
 
 void forceTest(){
   HX711 forceSensor;
-  const int calibrationFactorNewtons = 6700;
+  const int calibrationFactorGrams = 375;
 
   forceSensor.begin(FORCE_DAT, FORCE_CLK);
   forceSensor.tare();
-  forceSensor.set_scale(calibrationFactorNewtons);
+  forceSensor.set_scale(calibrationFactorGrams);
 
   int randomNumber = random(1, 10);
   Serial.println(randomNumber);
@@ -41,7 +43,7 @@ void forceTest(){
 
   float total = 0;
   for (int i = 0; i < 5; i++){
-    total += forceSensor.get_units(10);
+    total += (forceSensor.get_units(10) * 0.00981);
     delay(1000);
   }
   float averageReading = total / 5;
@@ -137,7 +139,16 @@ void timePerceptionTest() {
 }
 
 //===============================================================
-
+void calibrateMPU(MPU6050& mpu) {
+  long sum = 0;
+  for (int i = 0; i < 200; i++) {
+    int16_t ax, ay, az, gx, gy, gz;
+    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    sum += ax;
+    delay(5);
+  }
+  ax_offset = sum / 200;
+}
 void anglePerceptionTest(){
   bool positive = random(0, 2);
   int randomAngle;
@@ -150,15 +161,12 @@ void anglePerceptionTest(){
   Serial.println(randomAngle);
   delay(3000);
 
-  MPU6050 mpu;
-  Wire.begin();
-  mpu.initialize();
 
   float totalError = 0;
   for (int i = 0; i < 5; i++) {
     int16_t ax, ay, az, gx, gy, gz;
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    float angle = atan2((float)ax, (float)az) * 180.0 / PI;
+    float angle = atan2((float)(ax - ax_offset), (float)az) * 180.0 / PI;
     float error = abs(angle - randomAngle);
     totalError += error;
     delay(1000);
@@ -174,6 +182,10 @@ void anglePerceptionTest(){
 void setup() {
   Serial.begin(9600);
   randomSeed(analogRead(0));
+
+  Wire.begin();
+  mpu.initialize();
+  calibrateMPU(mpu);
 
   pinMode(FORCE_DAT,        INPUT);
   pinMode(FORCE_CLK,        OUTPUT);
