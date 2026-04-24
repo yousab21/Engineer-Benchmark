@@ -1,7 +1,9 @@
+
 import serial
 import time
 import json
 import os
+import tempfile
 from colorama import Fore, Back, Style, init
 init()
 
@@ -84,8 +86,18 @@ class Ye_Other_Json_Parcer:
             return {}
 
     def saveScores(self, data):
-        with open(self.filename, "w") as file:
-            json.dump(data, file, indent=2)
+       while True:
+            try:
+                dir = os.path.dirname(os.path.abspath(self.filename))
+                with tempfile.NamedTemporaryFile('w',dir=dir, delete=False, suffix='.tmp') as tmp:
+                    json.dump(data,tmp,indent=2)
+                    tmp_path=tmp.name
+                os.replace(tmp_path, self.filename)
+                break
+            except OSError as error:
+                utils.print_centered("Failed to save.. Retrying..")
+                time.sleep(1)
+
 
 parcer = Ye_Other_Json_Parcer()
 
@@ -137,7 +149,7 @@ class Admin:
                 utils.print_centered("Enter the name of the user:")
                 name = input()
                 if self.deleteUser(name.lower()):
-                    del self.ui.leaderboard[name.lower()]
+                    self.ui.leaderboard.pop(name.lower(), None) #safer to delete this way
                     utils.print_centered(f"{name} deleted successfully.")
                 else:
                     utils.print_centered("User not found.")
@@ -334,7 +346,16 @@ class UI:
 
     def welcomeScreen(self):
         utils.clear()
-        utils.print_centered("=========== ENGINEER BENCHMARK =============")
+        utils.print_centered(r"╔═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗")
+        utils.print_centered(r"║   ______ _   _  _____ _____ _   _ ______ ______ _____        ____  ______ _   _  _____ _    _ __  __          _____  _  __  ║")
+        utils.print_centered(r"║  |  ____| \ | |/ ____|_   _| \ | |  ____|  ____|  __ \      |  _ \|  ____| \ | |/ ____| |  | |  \/  |   /\   |  __ \| |/ /  ║")
+        utils.print_centered(r"║  | |__  |  \| | |  __  | | |  \| | |__  | |__  | |__) |     | |_) | |__  |  \| | |    | |__| | \  / |  /  \  | |__) | ' /   ║")
+        utils.print_centered(r"║  |  __| | . ` | | |_ | | | | . ` |  __| |  __| |  _  /      |  _ <|  __| | . ` | |    |  __  | |\/| | / /\ \ |  _  /|  <    ║")
+        utils.print_centered(r"║  | |____| |\  | |__| |_| |_| |\  | |____| |____| | \ \      | |_) | |____| |\  | |____| |  | | |  | |/ ____ \| | \ \| . \   ║")
+        utils.print_centered(r"║  |______|_| \_|\_____|_____|_| \_|______|______|_|  \_\     |____/|______|_| \_|\_____|_|  |_|_|  |_/_/    \_\_|  \_\_|\_\  ║")
+        utils.print_centered(r"║                                                                                                                             ║")
+        utils.print_centered(r"╚═════════════════════════════════════════════════════════ ▲ ═════════════════════════════════════════════════════════════════╝")
+        utils.print_centered("")
         utils.print_centered("Enter a number.")
         utils.print_centered("1. Begin Trials")
         utils.print_centered("2. View Leaderboard")
@@ -371,6 +392,9 @@ class UI:
         utils.print_centered(f"Average:    {avg:.2f}%")
         if isNewBest:
             utils.print_centered("New personal best!")
+            rank = sum(1 for person in self.leaderboard.values() if person["AverageScore"]>avg) +1
+            total = len(self.leaderboard)
+            utils.print_centered(f"You are now ranked {rank} out of {total}!")
         utils.print_centered(f"press enter to continue : ")
         input()
 
@@ -382,37 +406,63 @@ class UI:
 
     def displayLeaderboard(self):
         utils.clear()
-        utils.print_centered("============ Leaderboard ==============")
+        utils.print_centered(r"╔═══════════════════════════════════════════════════════════════════════════════════════════════╗")
+        utils.print_centered(r"║   _      ______          _____  ______  _____     ____   ____          _____  _____   _____   ║")
+        utils.print_centered(r"║  | |    |  ____|   /\   |  __ \|  ____||  __ \   |  _ \ / __ \   /\   |  __ \|  __ \ / ____   ║")
+        utils.print_centered(r"║  | |    | |__     /  \  | |  | | |__   | |__) |  | |_) | |  | | /  \  | |__) | |  | | (___    ║")
+        utils.print_centered(r"║  | |    |  __|   / /\ \ | |  | |  __|  |  _  /   |  _ <| |  | |/ /\ \ |  _  /| |  | |\___ \   ║")
+        utils.print_centered(r"║  | |____| |____ / ____ \| |__| | |____ | | \ \   | |_) | |__| / ____ \| | \ \| |__| |____) |  ║")
+        utils.print_centered(r"║  |______|______/_/    \_\_____/|______||_|  \_\  |____/ \____/_/    \_\_|  \_\_____/|_____/   ║")
+        utils.print_centered(r"║                                                                                               ║")
+        utils.print_centered(r"╚══════════════════════════════════════════════ ▲ ══════════════════════════════════════════════╝")
         if not self.leaderboard:
             utils.print_centered("No scores yet.")
             utils.print_centered("Press enter for new participant...")
             input()
             return
-        sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1]["AverageScore"])
+        sortedScores = sorted(self.leaderboard.items(), key=lambda x: x[1]["AverageScore"], reverse=True)
         self.showLeaderboardHeader()
         for i, (name, data) in enumerate(sortedScores, 1):
             scores = [data['Station1(R)'], data['Station2(F)'], data['Station3(D)'], data['Station4(A)'], data['Station5(T)']]
             widths = [12, 12, 12, 12, 12]
             coloredCols = []
+            plainCols = []
             for j, (score, w) in enumerate(zip(scores, widths)):
                 color = SCORE_COLORS[j](score)
                 plain = f"{score:.2f}"
                 padded = plain.rjust(w)
+                plainCols.append(padded)
                 coloredCols.append(f"{Style.BRIGHT}{color}{padded}{Style.RESET_ALL}")
-            row = (f"{f'{i}. {name.capitalize()}':<20} | "
-                   f"{coloredCols[0]} | "
-                   f"{coloredCols[1]} | "
-                   f"{coloredCols[2]} | "
-                   f"{coloredCols[3]} | "
-                   f"{coloredCols[4]} | "
-                   f"{data['AverageScore']:>12.2f}")
-            utils.print_centered(row)
+
+            nameCol = f"{i}. {name.capitalize()}"
+            avgCol  = f"{data['AverageScore']:>12.2f}"
+
+            plainRow = (f"{nameCol:<20} | "
+                    f"{plainCols[0]} | "
+                    f"{plainCols[1]} | "
+                    f"{plainCols[2]} | "
+                    f"{plainCols[3]} | "
+                    f"{plainCols[4]} | "
+                    f"{avgCol}")
+
+            coloredRow = (f"{nameCol:<20} | "
+                      f"{coloredCols[0]} | "
+                      f"{coloredCols[1]} | "
+                      f"{coloredCols[2]} | "
+                      f"{coloredCols[3]} | "
+                      f"{coloredCols[4]} | "
+                      f"{avgCol}")
+
+            width = os.get_terminal_size().columns
+            padding = (width - len(plainRow)) // 2
+            print(" " * padding + coloredRow)
+
         utils.print_centered("Press enter for new participant...")
         input()
 
     def updateLeaderboard(self, name, scoresList, avgScore):
         name = name.lower()
-        if name not in self.leaderboard or avgScore < self.leaderboard[name]["AverageScore"]:
+        if name not in self.leaderboard or avgScore > self.leaderboard[name]["AverageScore"]:
             self.leaderboard[name] = {
                 "Station1(R)": scoresList[0],
                 "Station2(F)": scoresList[1],
