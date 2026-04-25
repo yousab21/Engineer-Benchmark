@@ -1,4 +1,3 @@
-
 import serial
 import time
 import json
@@ -7,9 +6,14 @@ import tempfile
 from colorama import Fore, Back, Style, init
 init()
 
+#arduino connection
 #PORT = '/dev/ttyUSB0'
 PORT = '/dev/ttyACM0'
 BAUD = 9600
+
+#esp32 Connection
+BLUETOOTH_PORT = '/dev/rfcomm0'
+BLUETOOTH_BAUD = 115200
 
 #=======================================
 class Utils:
@@ -37,6 +41,61 @@ def percentColor(score):
 SCORE_COLORS = [reflexColor, percentColor, percentColor, percentColor, percentColor]
 
 #========================================
+class esp32_Handler:
+    def __init__(self, bluetooth):
+        self.bluetooth = bluetooth
+
+    def safeRead(self):
+        response = self.readResponse()
+        while response is None:
+            utils.print_centered("Waiting for ESP32...")
+            time.sleep(2)
+            response = self.readResponse()
+        if "ERR" in response:
+            utils.print_centered(f"Sensor error: {response}")
+            return 0.0
+        return float(response)
+
+    def readResponse(self):
+        try:
+            attempts = 0
+            while attempts < 10:
+                line = self.bluetooth.readline().decode('utf-8').strip()
+                if line:
+                    return line
+                attempts += 1
+            utils.print_centered("Timed out waiting for ESP32.")
+            return None
+        except serial.SerialException:
+            utils.print_centered("ESP32 disconnected!")
+            return None
+        except UnicodeDecodeError:
+            utils.print_centered("Received bad data, retrying...")
+            return self.readResponse()
+
+    def sendRequest(self, request):
+        self.bluetooth.reset_input_buffer()
+        self.bluetooth.write(f'{request}\n'.encode())
+
+    def waitFor(self, expected):
+        while True:
+            line = self.readResponse()
+            if line and line == expected:
+                return
+            utils.print_centered(f"ESP32: {line}")
+
+    def beginTrial(self):
+        utils.print_centered("Calibrating heart rate sensor, please stay still...")
+        self.sendRequest("START")
+        self.waitFor("BASELINE_COLLECTING")
+        self.waitFor("READY")
+        utils.print_centered("Heart rate baseline locked. Trial starting!")
+
+    def endTrial(self):
+        self.sendRequest("STOP")
+        return self.safeRead()  # returns % increase as float
+
+
 class Ye_Old_Arduino_Handler:
     def __init__(self, ser):
         self.ser = ser
@@ -94,7 +153,7 @@ class Ye_Other_Json_Parcer:
                     tmp_path=tmp.name
                 os.replace(tmp_path, self.filename)
                 break
-            except OSError:
+            except OSError as error:
                 utils.print_centered("Failed to save.. Retrying..")
                 time.sleep(1)
 
@@ -161,13 +220,13 @@ class Test:
         self.randomNumber = 0
         self.error = 0
         try:
-            self.keyWord     = getattr(self.__class__, "keyWord")
-            self.testName    = getattr(self.__class__, "testName")
+            self.keyWord      = getattr(self.__class__, "keyWord")
+            self.testName     = getattr(self.__class__, "testName")
             self.instructions = getattr(self.__class__, "instructions")
-            self.timer       = getattr(self.__class__, "timer")
-            self.goodScore       = getattr(self.__class__, "goodScore")
-            self.okScore       = getattr(self.__class__, "okScore")
-            self.badScore      = getattr(self.__class__, "badScore")
+            self.timer        = getattr(self.__class__, "timer")
+            self.goodScore    = getattr(self.__class__, "goodScore")
+            self.okScore      = getattr(self.__class__, "okScore")
+            self.badScore     = getattr(self.__class__, "badScore")
         except AttributeError as e:
             raise Exception(f"{self.__class__.__name__} is missing required attribute: {e}")
 
@@ -208,14 +267,11 @@ class Test:
         print()
         if (self.calculateScore() > 90):
             utils.print_centered(f"{Style.BRIGHT}{Fore.GREEN}{self.goodScore}{Style.RESET_ALL}")
-
         elif (self.calculateScore() > 75):
             utils.print_centered(f"{Style.BRIGHT}{Fore.YELLOW}{self.okScore}{Style.RESET_ALL}")
-
         else:
             utils.print_centered(f"{Style.BRIGHT}{Fore.RED}{self.badScore}{Style.RESET_ALL}")
         print()
-
 
     def printResult(self):
         accuracy = max(0, 100 - self.error)
@@ -266,14 +322,11 @@ class ReflexTest(Test):
         print()
         if (self.calculateScore() < 200):
             utils.print_centered(f"{Style.BRIGHT}{Fore.GREEN}{self.goodScore}{Style.RESET_ALL}")
-
         elif (self.calculateScore() < 300):
             utils.print_centered(f"{Style.BRIGHT}{Fore.YELLOW}{self.okScore}{Style.RESET_ALL}")
-
         else:
             utils.print_centered(f"{Style.BRIGHT}{Fore.RED}{self.badScore}{Style.RESET_ALL}")
         print()
-
 
     def printResult(self):
         reflex = self.error
@@ -378,7 +431,7 @@ class UI:
         utils.print_centered(f"press enter to continue : ")
         input()
 
-    def showResults(self, name, scoresList, avg, isNewBest):
+    def showResults(self, name, scoresList, avg, heartRate, isNewBest):
         utils.clear()
         utils.print_centered(f"{name}, your results for this session:")
         labels = ["Reaction:", "Force:   ", "Distance:", "Angle:   ", "Time:    "]
@@ -390,16 +443,17 @@ class UI:
             scoreStr = f"{score:.2f}"
             print(plainText.center(width).replace(scoreStr, f"{Style.BRIGHT}{color}{scoreStr}{Style.RESET_ALL}"))
         utils.print_centered(f"Average:    {avg:.2f}%")
+        utils.print_centered(f"Heart Rate Increase: {heartRate:.2f}%")
         if isNewBest:
             utils.print_centered("New personal best!")
-            rank = sum(1 for person in self.leaderboard.values() if person["AverageScore"]>avg) +1
+            rank = sum(1 for person in self.leaderboard.values() if person["AverageScore"] > avg) + 1
             total = len(self.leaderboard)
             utils.print_centered(f"You are now ranked {rank} out of {total}!")
         utils.print_centered(f"press enter to continue : ")
         input()
 
     def showLeaderboardHeader(self):
-        header  = f"{'Name':<20} | {'Reaction(ms)':>12} | {'Force%':>12} | {'Distance%':>12} | {'Angle%':>12} | {'Time%':>12} | {'Average%':>12}"
+        header  = f"{'Name':<20} | {'Reaction(ms)':>12} | {'Force%':>12} | {'Distance%':>12} | {'Angle%':>12} | {'Time%':>12} | {'HR Increase%':>12} | {'Average%':>12}"
         divider = "-" * len(header)
         utils.print_centered(header)
         utils.print_centered(divider)
@@ -435,6 +489,7 @@ class UI:
                 coloredCols.append(f"{Style.BRIGHT}{color}{padded}{Style.RESET_ALL}")
 
             nameCol = f"{i}. {name.capitalize()}"
+            hrCol   = f"{data.get('HeartRate(%)', 0.0):>12.2f}"
             avgCol  = f"{data['AverageScore']:>12.2f}"
 
             plainRow = (f"{nameCol:<20} | "
@@ -443,6 +498,7 @@ class UI:
                     f"{plainCols[2]} | "
                     f"{plainCols[3]} | "
                     f"{plainCols[4]} | "
+                    f"{hrCol} | "
                     f"{avgCol}")
 
             coloredRow = (f"{nameCol:<20} | "
@@ -451,6 +507,7 @@ class UI:
                       f"{coloredCols[2]} | "
                       f"{coloredCols[3]} | "
                       f"{coloredCols[4]} | "
+                      f"{hrCol} | "
                       f"{avgCol}")
 
             width = os.get_terminal_size().columns
@@ -460,15 +517,16 @@ class UI:
         utils.print_centered("Press enter for new participant...")
         input()
 
-    def updateLeaderboard(self, name, scoresList, avgScore):
+    def updateLeaderboard(self, name, scoresList, avgScore, heartRate):
         name = name.lower()
         if name not in self.leaderboard or avgScore > self.leaderboard[name]["AverageScore"]:
             self.leaderboard[name] = {
-                "Station1(R)": scoresList[0],
-                "Station2(F)": scoresList[1],
-                "Station3(D)": scoresList[2],
-                "Station4(A)": scoresList[3],
-                "Station5(T)": scoresList[4],
+                "Station1(R)":  scoresList[0],
+                "Station2(F)":  scoresList[1],
+                "Station3(D)":  scoresList[2],
+                "Station4(A)":  scoresList[3],
+                "Station5(T)":  scoresList[4],
+                "HeartRate(%)": heartRate,
                 "AverageScore": avgScore
             }
             parcer.saveScores(self.leaderboard)
@@ -478,14 +536,17 @@ class UI:
 #==========================================
 def main():
     print("Connecting to Arduino...")
-    ser = serial.Serial(PORT, BAUD, timeout=5)
+    ser        = serial.Serial(PORT, BAUD, timeout=5)
+    bluetooth  = serial.Serial(BLUETOOTH_PORT, BLUETOOTH_BAUD, timeout=5)
     time.sleep(10)
     ser.reset_input_buffer()
+    bluetooth.reset_input_buffer()
     print("Connected!")
 
     arduino = Ye_Old_Arduino_Handler(ser)
-    ui = UI()
-    admin = Admin(ui)
+    esp     = esp32_Handler(bluetooth)
+    ui      = UI()
+    admin   = Admin(ui)
 
     try:
         while True:
@@ -516,6 +577,9 @@ def main():
             if name in ui.leaderboard:
                 ui.showWelcomeBack(name.capitalize(), ui.leaderboard[name])
 
+            # signal ESP32 to begin — blocks until baseline is locked
+            esp.beginTrial()
+
             tests = [ReflexTest(arduino), ForceTest(arduino), DistanceTest(arduino), AnglePerceptionTest(arduino), TimePerceptionTest(arduino)]
             results = []
             for test in tests:
@@ -524,15 +588,19 @@ def main():
                 test.beginTest()
                 results.append(test.calculateScore())
 
-            avg = (results[1] + results[2] + results[3] + results[4]) / 4
-            newBest = ui.updateLeaderboard(name, results, avg)
-            ui.showResults(name.capitalize(), results, avg, newBest)
+            # signal ESP32 that all stations are done — get heart rate result
+            heartRate = esp.endTrial()
+
+            avg     = (results[1] + results[2] + results[3] + results[4]) / 4
+            newBest = ui.updateLeaderboard(name, results, avg, heartRate)
+            ui.showResults(name.capitalize(), results, avg, heartRate, newBest)
             ui.displayLeaderboard()
 
     finally:
         utils.clear()
         utils.print_centered("Exiting the ENGINEER BENCHMARK. Goodbye.")
         ser.close()
+        bluetooth.close()
 
 if __name__ == "__main__":
     main()
