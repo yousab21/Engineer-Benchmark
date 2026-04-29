@@ -24,8 +24,6 @@
 //the library those comments are just for us when we assemble the project
 // SDA -> A4 
 // SCL -> A5
-int16_t ax_offset = 0;  // <-- add this near the top with your defines
-MPU6050 mpu;
 
 //===============================================================
 
@@ -139,44 +137,66 @@ void timePerceptionTest() {
 }
 
 //===============================================================
+int16_t ax_offset = 0;
+int16_t az_offset = 0;
+MPU6050 mpu;
+
 void calibrateMPU(MPU6050& mpu) {
-  long sum = 0;
+  long sumX = 0;
+  long sumZ = 0;
+
   for (int i = 0; i < 200; i++) {
     int16_t ax, ay, az, gx, gy, gz;
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    sum += ax;
+
+    sumX += ax;
+    sumZ += az;
     delay(5);
   }
-  ax_offset = sum / 200;
+
+  ax_offset = sumX / 200;
+  az_offset = sumZ / 200;
 }
-void anglePerceptionTest(){
+
+void anglePerceptionTest() {
+  // Generate random target angle
   bool positive = random(0, 2);
-  int randomAngle;
-  if (positive) {
-    randomAngle = random(10, 80);
-  } else {
-    randomAngle = random(-80, -10);
-  }
+  int randomAngle = positive ? random(10, 80) : random(-80, -10);
 
   Serial.println(randomAngle);
   delay(3000);
 
+  float totalAngle = 0;
 
-  float totalError = 0;
-  for (int i = 0; i < 5; i++) {
+  // Collect multiple readings for stability
+  for (int i = 0; i < 10; i++) {
     int16_t ax, ay, az, gx, gy, gz;
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    float angle = atan2((float)(ax - ax_offset), (float)az) * 180.0 / PI;
-    float error = abs(angle - randomAngle);
-    totalError += error;
-    delay(1000);
+
+    // Properly calibrated angle calculation
+    float angle = atan2((float)(ax - ax_offset), (float)(az - az_offset)) * 180.0 / PI;
+
+    // Small noise filter (dead zone)
+    if (abs(angle) < 2) angle = 0;
+
+    totalAngle += angle;
+    delay(100);
   }
 
-  float avgError = totalError / 5;
-  float errorPercent = (avgError / abs(randomAngle)) * 100.0;
+  // Average measured angle
+  float avgAngle = totalAngle / 10.0;
+
+  // Compute absolute error
+  float error = abs(avgAngle - randomAngle);
+
+  // Fair scoring (based on full range, not target)
+  float errorPercent = (error / 90.0) * 100.0;
+
+  // Clamp to avoid crazy values
+  errorPercent = min(errorPercent, 100.0);
+
   Serial.println(errorPercent);
 }
-
 //===============================================================
 
 void setup() {

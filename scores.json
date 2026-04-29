@@ -1,18 +1,26 @@
 {
-  "o-shehata": {
-    "Station1(R)": 276.0,
-    "Station2(F)": 72.06,
-    "Station3(D)": 92.18,
+  "o. abdel7ai": {
+    "Station1(R)": 126.0,
+    "Station2(F)": 59.85,
+    "Station3(D)": 93.42,
     "Station4(A)": 0,
-    "Station5(T)": 92.1,
-    "AverageScore": 64.08500000000001
+    "Station5(T)": 91.6,
+    "AverageScore": 61.2175
   },
-  "o-abdelhai": {
-    "Station1(R)": 272.0,
-    "Station2(F)": 61.38,
-    "Station3(D)": 54.23,
+  "yousab": {
+    "Station1(R)": 128.0,
+    "Station2(F)": 98.13,
+    "Station3(D)": 95.81,
     "Station4(A)": 0,
-    "Station5(T)": 71.73,
-    "AverageScore": 46.835
+    "Station5(T)": 60.8,
+    "AverageScore": 63.685
+  },
+  "seif": {
+    "Station1(R)": 341.0,
+    "Station2(F)": 99.76,
+    "Station3(D)": 0,
+    "Station4(A)": 0,
+    "Station5(T)": 97.35,
+    "AverageScore": 49.2775
   }
 }
